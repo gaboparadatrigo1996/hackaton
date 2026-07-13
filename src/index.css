@@ -1,0 +1,157 @@
+@import 'leaflet/dist/leaflet.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-darkBg text-textPri font-sans antialiased overflow-hidden m-0 p-0 h-screen select-none;
+    background-color: #0d0d12;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #111117;
+}
+::-webkit-scrollbar-thumb {
+  background: #26262f;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #7c3aed;
+}
+
+/* Scrollable container specific scrollbars */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #26262f #111117;
+}
+
+/* Map specific styling overrides */
+.leaflet-container {
+  background: #0d0d12 !important;
+  width: 100%;
+  height: 100%;
+  font-family: inherit;
+}
+
+.leaflet-bar {
+  border: 1px solid #26262f !important;
+  box-shadow: none !important;
+}
+
+.leaflet-bar a {
+  background-color: #1a1a22 !apply text-textPri border-b border-panelBorder;
+  color: #e5e5e5 !important;
+  border-bottom: 1px solid #26262f !important;
+}
+
+.leaflet-bar a:hover {
+  background-color: #26262f !important;
+  color: #7c3aed !important;
+}
+
+.leaflet-control-zoom-in, .leaflet-control-zoom-out {
+  border-radius: 4px !important;
+}
+
+/* Pulse Animations for Markers */
+@keyframes markerPulseRed {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+@keyframes markerPulseOrange {
+  0% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+}
+
+@keyframes markerPulseGreen {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+@keyframes markerPulsePurp {
+  0% {
+    box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(167, 139, 250, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(167, 139, 250, 0);
+  }
+}
+
+.pulse-red {
+  animation: markerPulseRed 2s infinite;
+}
+
+.pulse-orange {
+  animation: markerPulseOrange 2s infinite;
+}
+
+.pulse-green {
+  animation: markerPulseGreen 2s infinite;
+}
+
+.pulse-purp {
+  animation: markerPulsePurp 2s infinite;
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background: rgba(26, 26, 34, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(38, 38, 47, 0.7);
+}
+
+.glass-dropdown {
+  background: rgba(17, 17, 23, 0.95);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(38, 38, 47, 0.9);
+}
+
+/* Toast animation */
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
