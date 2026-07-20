@@ -18,6 +18,13 @@ export interface Sensor {
 }
 
 /**
+ * Schema Swagger: SensorRegistroDTO (POST /api/sensor)
+ */
+export interface SensorRegistroDTO {
+  numeroSerie: string;
+}
+
+/**
  * Modelo de datos retornado por GET /api/contenedor (contenedor-controller: listar)
  * Schema Swagger: ContenedorInfoDTO
  */
@@ -34,6 +41,14 @@ export interface ContenedorInfoDTO {
   fechaModificion: string | null; // Nombre exacto del campo en Swagger backend
   capacidad: number;
   estado: EstadoContenedor;
+}
+
+/**
+ * Schema Swagger: ContenedorRegistroDTO (POST /api/contenedor)
+ */
+export interface ContenedorRegistroDTO {
+  codigoMunicipal: string;
+  capacidad: number;
 }
 
 /**
@@ -90,6 +105,17 @@ export interface SensorAsignadoDetalleDTO {
 }
 
 /**
+ * Schema Swagger: AsignacionRegistroDTO (POST /api/asignacion/asignar)
+ */
+export interface AsignacionRegistroDTO {
+  idContenedor: number;
+  idSensor: number;
+  latitud: number;
+  longitud: number;
+  estado: "NO_DESPLEGADO" | "DESPLEGADO" | "FINALIZADO";
+}
+
+/**
  * Modelo de estadísticas por nivel de llenado.
  * GET /api/estadisticas/niveles-llenado
  * Schema Swagger: ContContenedorNivelDTO
@@ -110,6 +136,14 @@ export interface ContContenedorEstados {
   ASIGNADO: number;
   MANTENIMIENTO: number;
   INACTIVO: number;
+}
+
+/**
+ * Schema Swagger: LatLng
+ */
+export interface LatLng {
+  latitude: number;
+  longitude: number;
 }
 
 /**
@@ -135,4 +169,23 @@ export interface CocheInfoDTO {
   longitud: number;
   estadoCoche: "DISPONIBLE" | "NO_DISPONIBLE";
   capacidad: number;
+}
+
+/**
+ * Schema Swagger: CocheRegistroDTO (POST /api/coches)
+ */
+export interface CocheRegistroDTO {
+  placa: string;
+  latitud: number;
+  longitud: number;
+  estadoCoche: "DISPONIBLE" | "NO_DISPONIBLE";
+  capacidad: number;
+}
+
+/**
+ * Schema Swagger: ResultadoPlanificacion (POST /api/coches/calcular)
+ */
+export interface ResultadoPlanificacion {
+  asignaciones: Record<string, string[]>;
+  geometrias: Record<string, RutaDTO>;
 }
