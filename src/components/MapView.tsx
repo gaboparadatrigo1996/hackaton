@@ -3,7 +3,7 @@ import L from "leaflet";
 import { useContainerStore } from "../store/useContainerStore";
 import { useVehicleSimulation } from "../hooks/useVehicleSimulation";
 import type { LiveCochePosition } from "../hooks/useVehicleSimulation";
-import { Truck, RefreshCw, AlertTriangle, Play, Pause, Navigation, X, ShieldCheck } from "lucide-react";
+import { Truck, RefreshCw, AlertTriangle, Navigation, X, ShieldCheck } from "lucide-react";
 
 interface MapViewProps {
   isLoading?: boolean;
@@ -35,11 +35,8 @@ export const MapView: React.FC<MapViewProps> = ({
     optimalRoute,
     setRoutingMode,
     isRoutingLoading,
-    coches,
     selectedCocheId,
     setSelectedCocheId,
-    isSimulatingVehicles,
-    toggleSimulatingVehicles,
   } = useContainerStore();
 
   // Hook de simulación en tiempo real para la flota de coches (GET /api/coches)
@@ -155,26 +152,33 @@ export const MapView: React.FC<MapViewProps> = ({
     });
   }, [containers, selectedContainerId, setSelectedContainerId, setSelectedCocheId]);
 
-  // 3. Render and Animate Vehicle Fleet Markers (GET /api/coches)
+  // 3. Render Vehicle Fleet Markers (GET /api/coches) & Animation on Route
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
     liveCoches.forEach((coche: LiveCochePosition) => {
       const isSelected = selectedCocheId === coche.idCoche;
+      const isMoving = coche.isMoving;
+
+      const statusBadge = isMoving
+        ? `<span class="h-1.5 w-1.5 rounded-full bg-accentGreen animate-ping"></span><span class="text-accentGreen">EN RUTA</span>`
+        : `<span class="h-1.5 w-1.5 rounded-full bg-accentPurp"></span><span>BASE</span>`;
 
       const vehicleMarkerHtml = `
         <div class="relative flex flex-col items-center group transition-transform duration-300 ${
           isSelected ? "scale-125 z-[2500]" : "hover:scale-110 z-[1500]"
         }">
-          <!-- License plate badge -->
+          <!-- License plate & Status badge -->
           <div class="bg-darkBg border border-accentPurp text-[9px] font-extrabold font-mono text-textPri px-1.5 py-0.5 rounded shadow-lg flex items-center gap-1 mb-0.5 whitespace-nowrap">
-            <span class="h-1.5 w-1.5 rounded-full bg-accentGreen animate-ping"></span>
+            ${statusBadge}
             <span>${coche.placa}</span>
           </div>
 
           <!-- Metallic Truck Icon -->
-          <div class="relative flex items-center justify-center h-8 w-8 bg-gradient-to-br from-accentPurp to-accentPurpLight text-white rounded-full border-2 border-white/80 shadow-[0_0_12px_rgba(124,58,237,0.7)]">
+          <div class="relative flex items-center justify-center h-8 w-8 bg-gradient-to-br from-accentPurp to-accentPurpLight text-white rounded-full border-2 border-white/80 shadow-[0_0_12px_rgba(124,58,237,0.7)] ${
+            isMoving ? "animate-pulse" : ""
+          }">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-4.2a1 1 0 0 0-.28-.7l-3.3-3.3a1 1 0 0 0-.7-.28H15v7.5A1.5 1.5 0 0 0 16.5 18z"/><circle cx="6.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
           </div>
         </div>
@@ -299,6 +303,10 @@ export const MapView: React.FC<MapViewProps> = ({
     if (routingMode === "recolect") {
       setRoutingMode("none");
     } else {
+      // Usar la ubicación del primer camión como origen si está disponible
+      if (liveCoches.length > 0) {
+        setOperatorLocation({ lat: liveCoches[0].lat, lng: liveCoches[0].lng });
+      }
       setRoutingMode("recolect");
     }
   };
@@ -340,24 +348,6 @@ export const MapView: React.FC<MapViewProps> = ({
 
       {/* Fleet Controls & Simulation Overlay (Top Right) */}
       <div className="absolute top-4 right-4 z-[400] flex flex-col gap-2">
-        {/* Toggle Simulation Button for Vehicles */}
-        <button
-          onClick={toggleSimulatingVehicles}
-          className="glass-panel border-panelBorder hover:border-accentPurp/40 text-textPri px-3 py-2 text-xs font-semibold rounded-lg shadow-xl flex items-center gap-2 transition-all"
-        >
-          {isSimulatingVehicles ? (
-            <>
-              <Pause className="h-4 w-4 text-accentOrange animate-pulse" />
-              <span>Pausar simulación flota ({coches.length} vehículos)</span>
-            </>
-          ) : (
-            <>
-              <Play className="h-4 w-4 text-accentGreen" />
-              <span>Reanudar simulación flota ({coches.length} vehículos)</span>
-            </>
-          )}
-        </button>
-
         {/* Optimize Route Button */}
         <button
           onClick={handleRecolectionRoute}
@@ -372,7 +362,7 @@ export const MapView: React.FC<MapViewProps> = ({
           <span>
             {routingMode === "recolect"
               ? "Cancelar ruta recolección"
-              : `Optimizar ruta (${activeFullBinsCount} llenos)`}
+              : `Iniciar Ruta de Recolección (${activeFullBinsCount} llenos)`}
           </span>
         </button>
 
@@ -385,8 +375,9 @@ export const MapView: React.FC<MapViewProps> = ({
 
         {routingMode === "recolect" && !isRoutingLoading && optimalRoute && (
           <div className="glass-panel border-panelBorder p-3 rounded-lg shadow-xl text-xs flex flex-col gap-1.5 animate-slide-in min-w-[200px]">
-            <div className="text-[10px] text-accentRed uppercase font-bold tracking-wider mb-0.5">
-              Ruta de Recogida TSP
+            <div className="text-[10px] text-accentRed uppercase font-bold tracking-wider mb-0.5 flex items-center justify-between">
+              <span>Ruta Activa - En movimiento</span>
+              <span className="h-2 w-2 rounded-full bg-accentGreen animate-ping"></span>
             </div>
             <div className="flex justify-between text-textSec">
               <span>Distancia total:</span>
@@ -395,13 +386,14 @@ export const MapView: React.FC<MapViewProps> = ({
               </span>
             </div>
             <div className="flex justify-between text-textSec">
-              <span>Tiempo total:</span>
+              <span>Tiempo estimado:</span>
               <span className="font-bold text-textPri font-mono">
                 {optimalRoute.duration} min
               </span>
             </div>
-            <div className="text-[10px] text-textSec/70 mt-1 border-t border-panelBorder/30 pt-1.5 leading-normal">
-              * Visitando los contenedores críticos por proximidad.
+            <div className="text-[10px] text-accentGreen/90 font-medium border-t border-panelBorder/30 pt-1.5 leading-normal flex items-center gap-1">
+              <Truck className="h-3 w-3" />
+              <span>Camión avanzando por las calles trazadas...</span>
             </div>
           </div>
         )}
@@ -417,7 +409,7 @@ export const MapView: React.FC<MapViewProps> = ({
               </span>
               <span className="flex items-center gap-1 text-[10px] text-accentGreen font-bold bg-accentGreen/10 px-2 py-0.5 rounded-full border border-accentGreen/20">
                 <ShieldCheck className="h-3 w-3" />
-                <span>{selectedCoche.estadoCoche}</span>
+                <span>{selectedCoche.isMoving ? "EN RUTA" : "EN BASE"}</span>
               </span>
             </div>
             <button
@@ -453,7 +445,7 @@ export const MapView: React.FC<MapViewProps> = ({
             className="w-full bg-accentPurp hover:bg-accentPurp/90 text-white font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow shadow-accentPurp/20 mt-1"
           >
             <Navigation className="h-3.5 w-3.5 fill-current" />
-            <span>Asignar Ruta de Recolección</span>
+            <span>Iniciar Ruta desde este Vehículo</span>
           </button>
         </div>
       )}
@@ -461,9 +453,9 @@ export const MapView: React.FC<MapViewProps> = ({
       {/* Floating Instructions Overlay */}
       <div className="absolute bottom-4 left-4 z-[400] glass-panel border-panelBorder/60 p-2.5 rounded-lg text-[10px] text-textSec max-w-xs shadow-md pointer-events-none">
         <div className="font-bold text-textPri mb-1 flex items-center gap-1">
-          <Truck className="h-3 w-3 text-accentPurp" /> Simulación de Flota IoT
+          <Truck className="h-3 w-3 text-accentPurp" /> Estado de Vehículos
         </div>
-        5 vehículos en vivo devueltos por <span className="font-mono text-accentPurpLight">GET /api/coches</span> patrullando las calles de La Paz en tiempo real.
+        Los camiones permanecen en su punto inicial registrado en <span className="font-mono text-accentPurpLight">GET /api/coches</span> y avanzan por las calles únicamente cuando se inicia una ruta.
       </div>
 
       {/* Floating Legend (Bottom Right) */}
@@ -473,7 +465,7 @@ export const MapView: React.FC<MapViewProps> = ({
         </span>
         <div className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-accentPurp shadow-[0_0_6px_#7c3aed]" />
-          <span>Vehículo / Coche</span>
+          <span>Camión en punto inicial</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-accentRed shadow-[0_0_4px_#ef4444]" />
