@@ -4,11 +4,11 @@ import { Sidebar } from "./components/Sidebar";
 import { MapView } from "./components/MapView";
 import { ContainerDetailPanel } from "./components/ContainerDetailPanel";
 import { NotificationToast } from "./components/NotificationToast";
-import { useContainerSensors } from "./hooks/useContainerSensors";
+import { useRealtimeSensors } from "./hooks/useRealtimeSensors";
 
 function App() {
-  // Activate the IoT sensor simulation WebSocket connection
-  useContainerSensors();
+  // Sincronización en tiempo real con el backend Azure de sensores
+  const { isLoading, isError, error, refetch } = useRealtimeSensors();
 
   return (
     <div className="flex flex-col h-screen w-screen bg-darkBg text-textPri overflow-hidden select-none">
@@ -21,13 +21,23 @@ function App() {
       {/* Main Workspace Layout */}
       <div className="flex flex-row flex-1 min-h-0 w-full overflow-hidden">
         {/* Left column: Sidebar dashboard metrics and list */}
-        <Sidebar />
+        <Sidebar
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          refetch={refetch}
+        />
 
         {/* Central interactive MapView */}
-        <MapView />
+        <MapView
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          refetch={refetch}
+        />
 
         {/* Right column: Selected container detailed insights */}
-        <ContainerDetailPanel />
+        <ContainerDetailPanel isLoading={isLoading} />
       </div>
 
       {/* Floating Notifications stack */}

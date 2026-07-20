@@ -1,11 +1,13 @@
+export * from "./types/sensor";
+
 export interface Contenedor {
-  id: string;              // "C001"
-  nombre: string;           // "Contenedor Plaza Mayor"
+  id: string;              // "LP-001"
+  nombre: string;           // "Contenedor LP-001"
   direccion: string;
-  zona: string;             // "Centro", "Chamberí", etc.
+  zona: string;             // "Centro", "Sopocachi", "Miraflores", "Zona Sur", etc.
   tipo: "General" | "Reciclaje" | "Orgánico" | "Vidrio";
   nivelLlenado: number;     // 0-100
-  capacidadLitros: number;  // 800
+  capacidadLitros: number;  // 500
   litrosActuales: number;
   estado: "lleno" | "medio" | "vacio" | "mantenimiento";
   ultimaRecogida: string;   // ISO date

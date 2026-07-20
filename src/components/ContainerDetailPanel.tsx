@@ -1,3 +1,4 @@
+import React from "react";
 import { useContainerStore } from "../store/useContainerStore";
 import { WeeklyFillChart } from "./WeeklyFillChart";
 import {
@@ -10,7 +11,13 @@ import {
   Trash2,
 } from "lucide-react";
 
-export const ContainerDetailPanel: React.FC = () => {
+interface ContainerDetailPanelProps {
+  isLoading?: boolean;
+}
+
+export const ContainerDetailPanel: React.FC<ContainerDetailPanelProps> = ({
+  isLoading,
+}) => {
   const {
     containers,
     selectedContainerId,
@@ -24,6 +31,20 @@ export const ContainerDetailPanel: React.FC = () => {
   } = useContainerStore();
 
   const container = containers.find((c) => c.id === selectedContainerId);
+
+  if (isLoading && selectedContainerId) {
+    return (
+      <aside className="w-[300px] border-l border-panelBorder bg-darkBg flex flex-col h-full flex-shrink-0 animate-pulse select-none p-4 gap-4">
+        <div className="h-6 bg-panelBorder/60 rounded w-full" />
+        <div className="h-24 bg-panelBg border border-panelBorder rounded-lg" />
+        <div className="h-10 bg-panelBorder/50 rounded-lg" />
+        <div className="grid grid-cols-2 gap-2">
+          <div className="h-16 bg-panelBg rounded-lg" />
+          <div className="h-16 bg-panelBg rounded-lg" />
+        </div>
+      </aside>
+    );
+  }
 
   if (!container) return null;
 
@@ -136,7 +157,7 @@ export const ContainerDetailPanel: React.FC = () => {
         </button>
       </div>
 
-      {/* Main Details Area (Scrollable if needed) */}
+      {/* Main Details Area */}
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 custom-scrollbar">
         {/* Name and address */}
         <div>
@@ -268,7 +289,7 @@ export const ContainerDetailPanel: React.FC = () => {
             </span>
           </div>
 
-          {/* Card 3: Última Recogida */}
+          {/* Card 3: Fechas de Recogida */}
           <div className="bg-panelBg border border-panelBorder p-2.5 rounded-lg flex flex-col col-span-2">
             <span className="text-[9px] uppercase font-bold text-textSec tracking-wider">
               Fechas de Recogida

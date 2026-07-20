@@ -1,9 +1,21 @@
 import React, { useEffect, useRef } from "react";
 import L from "leaflet";
 import { useContainerStore } from "../store/useContainerStore";
-import { Truck } from "lucide-react";
+import { Truck, RefreshCw, AlertTriangle } from "lucide-react";
 
-export const MapView: React.FC = () => {
+interface MapViewProps {
+  isLoading?: boolean;
+  isError?: boolean;
+  error?: Error | null;
+  refetch?: () => void;
+}
+
+export const MapView: React.FC<MapViewProps> = ({
+  isLoading,
+  isError,
+  error,
+  refetch,
+}) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<{ [id: string]: L.Marker }>({});
@@ -26,11 +38,11 @@ export const MapView: React.FC = () => {
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    // Create map instance
+    // Create map instance centered on La Paz, Bolivia
     const map = L.map(mapContainerRef.current, {
-      center: [-16.512, -68.115], // La Paz, Bolivia
+      center: [-16.512, -68.128],
       zoom: 13,
-      zoomControl: false, // We'll add it on bottom-left or top-left custom
+      zoomControl: false,
     });
 
     L.control
@@ -47,7 +59,7 @@ export const MapView: React.FC = () => {
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: "abcd",
         maxZoom: 20,
-      },
+      }
     ).addTo(map);
 
     mapRef.current = map;
@@ -67,7 +79,7 @@ export const MapView: React.FC = () => {
     const getMarkerHTML = (
       level: number,
       estado: string,
-      isSelected: boolean,
+      isSelected: boolean
     ) => {
       let colorClass = "bg-accentGreen";
       let pulseClass = "pulse-green bg-accentGreen/30";
@@ -112,7 +124,6 @@ export const MapView: React.FC = () => {
         const marker = markersRef.current[c.id];
         marker.setLatLng([c.lat, c.lng]);
         marker.setIcon(customIcon);
-        // Ensure selected marker is on top
         if (isSelected) {
           marker.setZIndexOffset(1000);
         } else {
@@ -129,7 +140,7 @@ export const MapView: React.FC = () => {
       }
     });
 
-    // Cleanup markers that are no longer in store (if any)
+    // Cleanup markers that are no longer in store
     const storeIds = new Set(containers.map((c) => c.id));
     Object.keys(markersRef.current).forEach((id) => {
       if (!storeIds.has(id)) {
@@ -236,13 +247,37 @@ export const MapView: React.FC = () => {
   };
 
   const activeFullBinsCount = containers.filter(
-    (c) => c.estado === "lleno",
+    (c) => c.estado === "lleno"
   ).length;
 
   return (
     <div className="relative flex-1 h-full min-w-0">
       {/* Leaflet container */}
       <div ref={mapContainerRef} className="w-full h-full" />
+
+      {/* Loading Overlay Badge */}
+      {isLoading && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] glass-panel border-accentPurp/30 px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-semibold text-textPri animate-slide-in">
+          <RefreshCw className="h-3.5 w-3.5 text-accentPurp animate-spin" />
+          <span>Cargando datos de sensores desde Azure...</span>
+        </div>
+      )}
+
+      {/* Error Overlay Badge */}
+      {isError && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-accentRed/90 border border-accentRed text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 text-xs font-bold animate-slide-in">
+          <AlertTriangle className="h-4 w-4" />
+          <span>{error?.message || "Error de conexión con la API de sensores"}</span>
+          {refetch && (
+            <button
+              onClick={() => refetch()}
+              className="bg-white/20 hover:bg-white/30 px-2.5 py-0.5 rounded text-[11px] font-semibold transition-all"
+            >
+              Reintentar
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Route Mode Overlay Control */}
       <div className="absolute top-4 right-4 z-[400] flex flex-col gap-2">
@@ -294,7 +329,7 @@ export const MapView: React.FC = () => {
         )}
       </div>
 
-      {/* Floating Instructions Overlay (top-left near zooms) */}
+      {/* Floating Instructions Overlay */}
       <div className="absolute bottom-4 left-4 z-[400] glass-panel border-panelBorder/60 p-2.5 rounded-lg text-[10px] text-textSec max-w-xs shadow-md pointer-events-none">
         <div className="font-bold text-textPri mb-1 flex items-center gap-1">
           <Truck className="h-3 w-3 text-accentPurp" /> Simulación de Camión
