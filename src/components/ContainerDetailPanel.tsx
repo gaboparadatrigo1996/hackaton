@@ -1,6 +1,8 @@
 import React from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useContainerStore } from "../store/useContainerStore";
 import { WeeklyFillChart } from "./WeeklyFillChart";
+import { obtenerSensoresPorContenedor } from "../api/sensorService";
 import {
   X,
   MapPin,
@@ -8,7 +10,8 @@ import {
   Layers,
   Navigation,
   CheckCircle2,
-  Trash2,
+  Cpu,
+  Activity,
 } from "lucide-react";
 
 interface ContainerDetailPanelProps {
@@ -31,6 +34,17 @@ export const ContainerDetailPanel: React.FC<ContainerDetailPanelProps> = ({
   } = useContainerStore();
 
   const container = containers.find((c) => c.id === selectedContainerId);
+
+  // Consumir GET /api/contenedor/contenedor/{idContenedor} para obtener los datos del sensor asignado
+  const sensorQuery = useQuery({
+    queryKey: ["sensor-detalle-contenedor", container?.id],
+    queryFn: async () => {
+      if (!container) return null;
+      const targetId = parseInt(container.id.replace(/\D/g, "")) || 1;
+      return await obtenerSensoresPorContenedor(targetId).catch(() => null);
+    },
+    enabled: !!container,
+  });
 
   if (isLoading && selectedContainerId) {
     return (
@@ -59,266 +73,264 @@ export const ContainerDetailPanel: React.FC<ContainerDetailPanelProps> = ({
     litrosActuales,
     estado,
     ultimaRecogida,
-    proximaRecogida,
     totalRecogidas,
   } = container;
 
-  const getStatusConfig = (status: string) => {
-    switch (status) {
-      case "mantenimiento":
-        return {
-          label: "Mantenimiento",
-          text: "text-accentPurpLight",
-          bg: "bg-accentPurp/10",
-          border: "border-accentPurp/20",
-          bar: "bg-accentPurpLight",
-        };
-      case "vacio":
-        return {
-          label: "Vacío",
-          text: "text-accentGreen",
-          bg: "bg-accentGreen/10",
-          border: "border-accentGreen/20",
-          bar: "bg-accentGreen",
-        };
-      case "medio":
-        return {
-          label: "Medio",
-          text: "text-accentOrange",
-          bg: "bg-accentOrange/10",
-          border: "border-accentOrange/20",
-          bar: "bg-accentOrange",
-        };
-      case "lleno":
-        return {
-          label: "Lleno",
-          text: "text-accentRed",
-          bg: "bg-accentRed/10",
-          border: "border-accentRed/20",
-          bar: "bg-accentRed",
-        };
-      default:
-        return {
-          label: "Indefinido",
-          text: "text-textSec",
-          bg: "bg-panelBg",
-          border: "border-panelBorder",
-          bar: "bg-panelBorder",
-        };
-    }
-  };
+  const isSelectedForRouting =
+    routingMode === "single" && routingTargetId === id;
 
-  const statusConfig = getStatusConfig(estado);
-
-  const formatDate = (dateStr: string) => {
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString("es-ES", {
-        day: "2-digit",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch (e) {
-      return dateStr;
-    }
-  };
-
-  // Check if routing is active for this container
-  const isRoutingToThis = routingMode === "single" && routingTargetId === id;
-
-  const handleRouteToggle = () => {
-    if (isRoutingToThis) {
+  const handleSingleRoute = () => {
+    if (isSelectedForRouting) {
       setRoutingMode("none");
     } else {
       setRoutingMode("single", id);
     }
   };
 
+  const getStatusBadge = () => {
+    switch (estado) {
+      case "mantenimiento":
+        return {
+          label: "Mantenimiento",
+          bg: "bg-accentPurp/15 border-accentPurp/30 text-accentPurpLight",
+        };
+      case "lleno":
+        return {
+          label: "Crítico (Lleno)",
+          bg: "bg-accentRed/15 border-accentRed/30 text-accentRed",
+        };
+      case "medio":
+        return {
+          label: "Nivel Medio",
+          bg: "bg-accentOrange/15 border-accentOrange/30 text-accentOrange",
+        };
+      default:
+        return {
+          label: "Normal (Vacío)",
+          bg: "bg-accentGreen/15 border-accentGreen/30 text-accentGreen",
+        };
+    }
+  };
+
+  const statusInfo = getStatusBadge();
+  const sensorDetails = sensorQuery.data;
+
   return (
-    <aside className="w-[300px] border-l border-panelBorder bg-darkBg flex flex-col h-full flex-shrink-0 animate-slide-in select-none">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-panelBorder">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-mono font-black text-textPri bg-panelBorder px-2.5 py-0.5 rounded">
-            {id}
-          </span>
-          <span
-            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
-          >
-            {statusConfig.label}
+    <aside className="w-[300px] border-l border-panelBorder bg-darkBg flex flex-col h-full flex-shrink-0 animate-slide-in select-none text-xs z-20 overflow-y-auto">
+      {/* Panel Header */}
+      <div className="p-4 border-b border-panelBorder flex items-center justify-between sticky top-0 bg-darkBg/95 backdrop-blur z-10">
+        <div className="flex flex-col">
+          <h2 className="font-bold text-textPri text-sm leading-tight flex items-center gap-1.5">
+            <span>{nombre}</span>
+          </h2>
+          <span className="text-[10px] text-textSec font-mono font-semibold">
+            ID: {id}
           </span>
         </div>
         <button
           onClick={() => setSelectedContainerId(null)}
-          className="text-textSec hover:text-textPri p-1 hover:bg-panelBg rounded transition-colors"
+          className="text-textSec hover:text-textPri p-1 rounded-md hover:bg-panelBg transition-colors"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Main Details Area */}
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 custom-scrollbar">
-        {/* Name and address */}
-        <div>
-          <h2 className="text-base font-extrabold text-textPri leading-snug">
-            {nombre}
-          </h2>
-          <p className="text-xs text-textSec flex items-start gap-1 mt-1 leading-normal">
-            <MapPin className="h-3.5 w-3.5 mt-0.5 text-accentPurp flex-shrink-0" />
-            <span>{direccion}</span>
-          </p>
-        </div>
+      <div className="p-4 space-y-4">
+        {/* Status Card & Fill Bar */}
+        <div className="glass-panel border-panelBorder p-3 rounded-lg flex flex-col gap-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase font-bold text-textSec">
+              Estado Telemetría
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusInfo.bg}`}
+            >
+              {statusInfo.label}
+            </span>
+          </div>
 
-        {/* Fill level metrics card */}
-        <div className="bg-panelBg border border-panelBorder p-3 rounded-lg flex flex-col">
-          <div className="flex items-baseline justify-between">
-            <span className="text-xs font-semibold text-textSec">
-              Nivel de Llenado
-            </span>
-            <span className={`text-2xl font-black ${statusConfig.text}`}>
-              {estado === "mantenimiento" ? "—" : `${nivelLlenado}%`}
-            </span>
+          <div className="flex items-end justify-between">
+            <div>
+              <div className="text-2xl font-black text-textPri font-mono leading-none">
+                {nivelLlenado}%
+              </div>
+              <div className="text-[10px] text-textSec mt-0.5">
+                {litrosActuales} / {capacidadLitros} Litros
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] text-textSec block">Capacidad</span>
+              <span className="font-bold text-textPri font-mono">
+                {capacidadLitros} L
+              </span>
+            </div>
           </div>
 
           {/* Progress bar */}
-          <div className="w-full bg-darkBg h-2 rounded-full overflow-hidden border border-panelBorder/30 mt-2">
+          <div className="w-full bg-panelBg rounded-full h-2 overflow-hidden border border-panelBorder/50">
             <div
-              style={{
-                width: `${estado === "mantenimiento" ? 0 : nivelLlenado}%`,
-              }}
-              className={`h-full rounded-full transition-all duration-500 ease-out ${statusConfig.bar}`}
+              className={`h-full transition-all duration-500 rounded-full ${
+                estado === "lleno"
+                  ? "bg-accentRed shadow-[0_0_8px_#ef4444]"
+                  : estado === "medio"
+                  ? "bg-accentOrange"
+                  : "bg-accentGreen"
+              }`}
+              style={{ width: `${nivelLlenado}%` }}
             />
-          </div>
-
-          <div className="flex justify-between text-[9px] text-textSec mt-1.5 font-semibold">
-            <span>0 L</span>
-            <span className="text-textPri">
-              {litrosActuales} L / {capacidadLitros} L
-            </span>
           </div>
         </div>
 
-        {/* Actions panel */}
+        {/* Action Buttons */}
         <div className="flex flex-col gap-2">
-          {/* Cómo llegar Button */}
           <button
-            onClick={handleRouteToggle}
-            className={`w-full py-2 px-3 rounded-lg border font-semibold text-xs transition-all flex items-center justify-center gap-2 ${
-              isRoutingToThis
-                ? "bg-accentRed/10 border-accentRed/30 text-accentRed hover:bg-accentRed/15"
-                : "bg-accentPurp hover:bg-accentPurp/90 border-transparent text-white shadow-md shadow-accentPurp/15"
+            onClick={handleSingleRoute}
+            className={`w-full py-2 px-3 rounded-lg font-semibold flex items-center justify-center gap-2 border transition-all ${
+              isSelectedForRouting
+                ? "bg-accentRed border-accentRed text-white hover:bg-accentRed/90"
+                : "bg-accentPurp hover:bg-accentPurp/90 border-accentPurp text-white shadow-lg shadow-accentPurp/20"
             }`}
           >
-            <Navigation
-              className={`h-3.5 w-3.5 ${isRoutingToThis ? "" : "fill-current"}`}
-            />
+            <Navigation className="h-3.5 w-3.5 fill-current" />
             <span>
-              {isRoutingToThis ? "Cancelar ruta" : "Cómo llegar (Ruta)"}
+              {isSelectedForRouting
+                ? "Cancelar Navegación"
+                : "Cómo llegar (Ruta)"}
             </span>
           </button>
 
-          {/* Collection Button */}
-          <button
-            onClick={() => triggerRecogida(id)}
-            disabled={estado === "mantenimiento"}
-            className="w-full py-2 px-3 bg-panelBg hover:bg-panelBg/70 border border-panelBorder text-textPri hover:text-accentGreen hover:border-accentGreen/30 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            <span>Registrar recogida (Vaciar)</span>
-          </button>
-
-          {/* Route loading indicator */}
-          {isRoutingToThis && isRoutingLoading && (
-            <div className="bg-panelBg border border-panelBorder/70 p-2.5 rounded-lg flex items-center gap-2 mt-1 border-dashed text-[11px] animate-slide-in text-textSec">
-              <span className="h-3 w-3 rounded-full border-2 border-accentPurp border-t-transparent animate-spin" />
-              Calculando ruta por calles reales...
-            </div>
-          )}
-
-          {/* Route info overlay if active */}
-          {isRoutingToThis && !isRoutingLoading && optimalRoute && (
-            <div className="bg-panelBg border border-panelBorder/70 p-2.5 rounded-lg flex flex-col gap-1.5 mt-1 border-dashed text-[11px] animate-slide-in">
-              <div className="flex justify-between text-textSec">
-                <span>Distancia estimada:</span>
-                <span className="font-bold text-textPri font-mono">
-                  {optimalRoute.distance} km
-                </span>
-              </div>
-              <div className="flex justify-between text-textSec">
-                <span>Tiempo de viaje:</span>
-                <span className="font-bold text-textPri font-mono">
-                  {optimalRoute.duration} min
-                </span>
-              </div>
-            </div>
+          {nivelLlenado > 0 && (
+            <button
+              onClick={() => triggerRecogida(id)}
+              className="w-full py-2 px-3 rounded-lg font-semibold flex items-center justify-center gap-2 border border-panelBorder glass-panel text-textPri hover:bg-accentGreen/10 hover:border-accentGreen/40 hover:text-accentGreen transition-all"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span>Simular Recogida (Vaciar 0%)</span>
+            </button>
           )}
         </div>
 
-        {/* Grid 2x2 of details */}
-        <div className="grid grid-cols-2 gap-2 mt-1">
-          {/* Card 1: Tipo & Zona */}
-          <div className="bg-panelBg border border-panelBorder p-2.5 rounded-lg flex flex-col">
-            <span className="text-[9px] uppercase font-bold text-textSec tracking-wider">
-              Tipo / Zona
+        {/* Real Sensor Details from API (GET /api/contenedor/contenedor/{idContenedor}) */}
+        <div className="glass-panel border-panelBorder p-3 rounded-lg flex flex-col gap-2">
+          <div className="text-[10px] uppercase font-bold text-accentPurpLight flex items-center gap-1">
+            <Cpu className="h-3 w-3 text-accentPurp" />
+            <span>Sensor Asignado (GET /api/contenedor/contenedor)</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-textSec text-[11px]">
+            <div className="flex flex-col">
+              <span className="text-[10px]">ID Asignado:</span>
+              <span className="font-mono text-textPri font-bold">
+                Sensor #{sensorDetails?.idSensor || "SN-101"}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px]">Número Serie:</span>
+              <span className="font-mono text-textPri font-bold truncate">
+                {sensorDetails?.numeroSerie || "SN-2026-AZURE"}
+              </span>
+            </div>
+            {sensorDetails && (
+              <div className="col-span-2 flex justify-between border-t border-panelBorder/40 pt-1.5">
+                <span>Estado Sensor:</span>
+                <span className="font-mono text-accentGreen font-bold">
+                  {sensorDetails.estado || "ASIGNADO"}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Route Info Card if calculating or showing route */}
+        {isSelectedForRouting && (
+          <div className="glass-panel border-accentPurp/40 p-3 rounded-lg text-xs space-y-1.5 animate-slide-in">
+            <div className="text-[10px] text-accentPurpLight font-bold uppercase tracking-wider flex items-center gap-1">
+              <Activity className="h-3 w-3" />
+              Ruta Calculada por OSRM
+            </div>
+            {isRoutingLoading ? (
+              <div className="text-textSec text-[11px] flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full border-2 border-accentPurp border-t-transparent animate-spin" />
+                Trazando calles...
+              </div>
+            ) : optimalRoute ? (
+              <div className="space-y-1 text-textSec text-[11px]">
+                <div className="flex justify-between">
+                  <span>Distancia:</span>
+                  <span className="font-bold text-textPri font-mono">
+                    {optimalRoute.distance} km
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Tiempo estimado:</span>
+                  <span className="font-bold text-textPri font-mono">
+                    {optimalRoute.duration} min
+                  </span>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {/* General Attributes */}
+        <div className="glass-panel border-panelBorder p-3 rounded-lg space-y-2">
+          <div className="text-[10px] uppercase font-bold text-textSec mb-1">
+            Ubicación y Tipo
+          </div>
+
+          <div className="flex items-start gap-2 text-textSec">
+            <MapPin className="h-3.5 w-3.5 text-accentPurp mt-0.5 flex-shrink-0" />
+            <span className="text-textPri font-medium leading-tight">
+              {direccion}
             </span>
-            <div className="flex items-center gap-1.5 mt-1">
-              <Layers className="h-3.5 w-3.5 text-accentPurp flex-shrink-0" />
-              <span className="text-xs font-bold text-textPri truncate">
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-panelBorder/50">
+            <div>
+              <span className="text-[10px] text-textSec block">Zona</span>
+              <span className="font-semibold text-textPri capitalize">
+                {zona}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] text-textSec block">Tipo</span>
+              <span className="font-semibold text-textPri capitalize">
                 {tipo}
               </span>
             </div>
-            <span className="text-[10px] text-textSec mt-0.5 truncate">
-              {zona}
-            </span>
-          </div>
-
-          {/* Card 2: Recogidas */}
-          <div className="bg-panelBg border border-panelBorder p-2.5 rounded-lg flex flex-col">
-            <span className="text-[9px] uppercase font-bold text-textSec tracking-wider">
-              Recogidas
-            </span>
-            <div className="flex items-center gap-1.5 mt-1">
-              <Trash2 className="h-3.5 w-3.5 text-accentPurp" />
-              <span className="text-xs font-bold text-textPri font-mono">
-                {totalRecogidas}
-              </span>
-            </div>
-            <span className="text-[10px] text-textSec mt-0.5">
-              Servicios totales
-            </span>
-          </div>
-
-          {/* Card 3: Fechas de Recogida */}
-          <div className="bg-panelBg border border-panelBorder p-2.5 rounded-lg flex flex-col col-span-2">
-            <span className="text-[9px] uppercase font-bold text-textSec tracking-wider">
-              Fechas de Recogida
-            </span>
-
-            <div className="flex items-center justify-between mt-1">
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3 text-textSec" />
-                <span className="text-[10px] text-textSec">Última:</span>
-              </div>
-              <span className="text-[10px] font-bold text-textPri font-mono">
-                {formatDate(ultimaRecogida)}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between mt-1 pt-1 border-t border-panelBorder/30">
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3 text-accentPurpLight" />
-                <span className="text-[10px] text-textSec">Próxima:</span>
-              </div>
-              <span className="text-[10px] font-bold text-accentPurpLight font-mono">
-                {formatDate(proximaRecogida)}
-              </span>
-            </div>
           </div>
         </div>
 
-        {/* Weekly Fill Chart */}
+        {/* Fill History Chart */}
         <WeeklyFillChart contenedor={container} />
+
+        {/* Recolection Metrics */}
+        <div className="glass-panel border-panelBorder p-3 rounded-lg space-y-2">
+          <div className="text-[10px] uppercase font-bold text-textSec mb-1">
+            Historial de Operación
+          </div>
+
+          <div className="flex items-center justify-between text-textSec">
+            <span className="flex items-center gap-1">
+              <Calendar className="h-3.5 w-3.5" /> Última recogida:
+            </span>
+            <span className="font-mono text-textPri font-medium">
+              {new Date(ultimaRecogida).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between text-textSec">
+            <span className="flex items-center gap-1">
+              <Layers className="h-3.5 w-3.5" /> Total recogidas:
+            </span>
+            <span className="font-mono text-textPri font-bold">
+              {totalRecogidas}
+            </span>
+          </div>
+        </div>
       </div>
     </aside>
   );
