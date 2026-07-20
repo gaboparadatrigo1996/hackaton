@@ -3,7 +3,7 @@ import type { Contenedor, NotificationItem } from "../types";
 import type { CocheInfoDTO } from "../types/sensor";
 import { initialContainers } from "../data/mockContainers";
 
-interface RouteInfo {
+export interface RouteInfo {
   path: [number, number][];
   distance: number; // en km
   duration: number; // en minutos
@@ -21,6 +21,7 @@ interface ContainerState {
   routingTargetId: string | null;
   operatorLocation: { lat: number; lng: number };
   optimalRoute: RouteInfo | null;
+  fleetRoutes: Record<number, RouteInfo>; // Rutas individuales para CADA uno de los 5 camiones
   isRoutingLoading: boolean;
 
   // Flota de Coches (GET /api/coches)
@@ -78,7 +79,7 @@ const calculateDistance = (
 // Public OSRM demo server: returns real driving directions that follow actual streets.
 const OSRM_ROUTE_URL = "https://router.project-osrm.org/route/v1/driving/";
 
-interface RoadRouteResult {
+export interface RoadRouteResult {
   path: [number, number][];
   distance: number; // km
   duration: number; // min
@@ -155,6 +156,7 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
   routingTargetId: null,
   operatorLocation: { lat: -16.512, lng: -68.128 },
   optimalRoute: null,
+  fleetRoutes: {},
   isRoutingLoading: false,
 
   // Flota de Coches (GET /api/coches)
@@ -188,12 +190,6 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
         }
         return c;
       });
-
-      setTimeout(() => {
-        if (get().routingMode !== "none") {
-          get().calculateRoute();
-        }
-      }, 0);
 
       return { containers: nextContainers };
     });
@@ -256,38 +252,43 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
       totalRecogidas:
         (get().containers.find((c) => c.id === id)?.totalRecogidas || 0) + 1,
     });
-
-    if (get().routingMode === "single" && get().routingTargetId === id) {
-      set({ routingMode: "none", routingTargetId: null, optimalRoute: null });
-    } else if (get().routingMode === "recolect") {
-      get().calculateRoute();
-    }
   },
 
   calculateRoute: async () => {
-    const { routingMode, routingTargetId, operatorLocation, containers } =
+    const { routingMode, routingTargetId, operatorLocation, containers, coches } =
       get();
 
     if (routingMode === "none") {
-      set({ optimalRoute: null, isRoutingLoading: false });
+      set({ optimalRoute: null, fleetRoutes: {}, isRoutingLoading: false });
       return;
     }
 
-    const startLoc: [number, number] = [
-      operatorLocation.lat,
-      operatorLocation.lng,
-    ];
+    set({ isRoutingLoading: true });
 
     if (routingMode === "single") {
       const target = containers.find((c) => c.id === routingTargetId);
       if (!target) {
-        set({ optimalRoute: null, isRoutingLoading: false });
+        set({ optimalRoute: null, fleetRoutes: {}, isRoutingLoading: false });
         return;
       }
 
-      const endLoc: [number, number] = [target.lat, target.lng];
+      // Encontrar el camión más cercano al contenedor seleccionado
+      let assignedCoche = coches[0];
+      let minDistance = Infinity;
 
-      set({ isRoutingLoading: true });
+      coches.forEach((coche) => {
+        const dist = calculateDistance(coche.latitud, coche.longitud, target.lat, target.lng);
+        if (dist < minDistance) {
+          minDistance = dist;
+          assignedCoche = coche;
+        }
+      });
+
+      const startLoc: [number, number] = assignedCoche
+        ? [assignedCoche.latitud, assignedCoche.longitud]
+        : [operatorLocation.lat, operatorLocation.lng];
+
+      const endLoc: [number, number] = [target.lat, target.lng];
       const roadRoute = await fetchRoadRoute([startLoc, endLoc]);
 
       if (
@@ -296,55 +297,107 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
       )
         return;
 
+      const singleRoute = roadRoute ?? buildFallbackRoute([startLoc, endLoc]);
+      const newFleetRoutes: Record<number, RouteInfo> = {};
+      if (assignedCoche) {
+        newFleetRoutes[assignedCoche.idCoche] = singleRoute;
+      }
+
       set({
-        optimalRoute: roadRoute ?? buildFallbackRoute([startLoc, endLoc]),
+        optimalRoute: singleRoute,
+        fleetRoutes: newFleetRoutes,
         isRoutingLoading: false,
       });
     } else if (routingMode === "recolect") {
-      const fullContainers = containers.filter((c) => c.estado === "lleno");
+      // Recolección multi-vehículo: Asignar TODOS los contenedores (o llenos/medios) entre TODOS los 5 camiones de la flota
+      const targetContainers = containers.filter((c) => c.estado === "lleno" || c.estado === "medio");
+      const activeContainers = targetContainers.length > 0 ? targetContainers : containers.slice(0, 10);
 
-      if (fullContainers.length === 0) {
-        set({ optimalRoute: null, isRoutingLoading: false });
-        return;
-      }
+      const activeCoches = coches.length > 0 ? coches : [
+        { idCoche: 1, placa: "ALTO-001", fechaRegistro: "", latitud: -16.5055, longitud: -68.1575, estadoCoche: "DISPONIBLE", capacidad: 400 },
+        { idCoche: 2, placa: "LP-9988", fechaRegistro: "", latitud: -16.4954, longitud: -68.1332, estadoCoche: "DISPONIBLE", capacidad: 400 },
+        { idCoche: 3, placa: "LPA9293", fechaRegistro: "", latitud: -16.487235, longitud: -68.140733, estadoCoche: "DISPONIBLE", capacidad: 400 },
+        { idCoche: 4, placa: "LPA777", fechaRegistro: "", latitud: -16.489055, longitud: -68.147483, estadoCoche: "DISPONIBLE", capacidad: 400 },
+        { idCoche: 6, placa: "RNA1234", fechaRegistro: "", latitud: -16.530701, longitud: -68.168427, estadoCoche: "DISPONIBLE", capacidad: 600 },
+      ];
 
-      let currentLoc = startLoc;
-      const unvisited = [...fullContainers];
-      const orderedStops: [number, number][] = [];
+      // Mapear cada contenedor al camión más cercano
+      const cocheAssignments: Map<number, Contenedor[]> = new Map();
+      activeCoches.forEach((c) => cocheAssignments.set(c.idCoche, []));
 
-      while (unvisited.length > 0) {
-        let closestIndex = 0;
-        let minDistance = Infinity;
+      activeContainers.forEach((container) => {
+        let closestCoche = activeCoches[0];
+        let minD = Infinity;
 
-        for (let i = 0; i < unvisited.length; i++) {
-          const d = calculateDistance(
-            currentLoc[0],
-            currentLoc[1],
-            unvisited[i].lat,
-            unvisited[i].lng
-          );
-          if (d < minDistance) {
-            minDistance = d;
-            closestIndex = i;
+        activeCoches.forEach((coche) => {
+          const d = calculateDistance(coche.latitud, coche.longitud, container.lat, container.lng);
+          if (d < minD) {
+            minD = d;
+            closestCoche = coche;
           }
+        });
+
+        cocheAssignments.get(closestCoche.idCoche)?.push(container);
+      });
+
+      // Calcular la ruta OSRM individual para CADA uno de los 5 camiones
+      const newFleetRoutes: Record<number, RouteInfo> = {};
+
+      const routePromises = activeCoches.map(async (coche) => {
+        const assignedBins = cocheAssignments.get(coche.idCoche) || [];
+        const startLoc: [number, number] = [coche.latitud, coche.longitud];
+
+        // Ordenar paradas del camión con heurística TSP de vecino más cercano
+        let currentLoc = startLoc;
+        const unvisited = [...assignedBins];
+        const orderedStops: [number, number][] = [];
+
+        while (unvisited.length > 0) {
+          let closestIndex = 0;
+          let minDistance = Infinity;
+
+          for (let i = 0; i < unvisited.length; i++) {
+            const d = calculateDistance(
+              currentLoc[0],
+              currentLoc[1],
+              unvisited[i].lat,
+              unvisited[i].lng
+            );
+            if (d < minDistance) {
+              minDistance = d;
+              closestIndex = i;
+            }
+          }
+
+          const nextStop = unvisited[closestIndex];
+          const nextLoc: [number, number] = [nextStop.lat, nextStop.lng];
+          orderedStops.push(nextLoc);
+          currentLoc = nextLoc;
+          unvisited.splice(closestIndex, 1);
         }
 
-        const nextStop = unvisited[closestIndex];
-        const nextLoc: [number, number] = [nextStop.lat, nextStop.lng];
-        orderedStops.push(nextLoc);
-        currentLoc = nextLoc;
-        unvisited.splice(closestIndex, 1);
-      }
+        const waypoints = [startLoc, ...orderedStops];
+        const roadRoute = await fetchRoadRoute(waypoints);
+        const routeResult = roadRoute ?? buildFallbackRoute(waypoints, 2);
 
-      const waypoints = [startLoc, ...orderedStops];
+        newFleetRoutes[coche.idCoche] = routeResult;
+      });
 
-      set({ isRoutingLoading: true });
-      const roadRoute = await fetchRoadRoute(waypoints);
+      await Promise.all(routePromises);
 
       if (get().routingMode !== "recolect") return;
 
+      // Unificar estadísticas globales para resumen
+      const totalDist = Object.values(newFleetRoutes).reduce((sum, r) => sum + r.distance, 0);
+      const maxDuration = Math.max(...Object.values(newFleetRoutes).map((r) => r.duration), 0);
+
       set({
-        optimalRoute: roadRoute ?? buildFallbackRoute(waypoints, 4),
+        optimalRoute: {
+          path: newFleetRoutes[activeCoches[0]?.idCoche]?.path || [],
+          distance: parseFloat(totalDist.toFixed(2)),
+          duration: maxDuration,
+        },
+        fleetRoutes: newFleetRoutes,
         isRoutingLoading: false,
       });
     }

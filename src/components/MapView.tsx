@@ -12,6 +12,8 @@ interface MapViewProps {
   refetch?: () => void;
 }
 
+const ROUTE_COLORS = ["#7c3aed", "#10b981", "#06b6d4", "#f59e0b", "#ec4899"];
+
 export const MapView: React.FC<MapViewProps> = ({
   isLoading,
   isError,
@@ -22,7 +24,7 @@ export const MapView: React.FC<MapViewProps> = ({
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<{ [id: string]: L.Marker }>({});
   const cocheMarkersRef = useRef<{ [idCoche: number]: L.Marker }>({});
-  const routePolylineRef = useRef<L.Polyline | null>(null);
+  const fleetPolylinesRef = useRef<{ [idCoche: number]: L.Polyline }>({});
   const operatorMarkerRef = useRef<L.Marker | null>(null);
 
   const {
@@ -33,6 +35,7 @@ export const MapView: React.FC<MapViewProps> = ({
     operatorLocation,
     setOperatorLocation,
     optimalRoute,
+    fleetRoutes,
     setRoutingMode,
     isRoutingLoading,
     selectedCocheId,
@@ -152,17 +155,18 @@ export const MapView: React.FC<MapViewProps> = ({
     });
   }, [containers, selectedContainerId, setSelectedContainerId, setSelectedCocheId]);
 
-  // 3. Render Vehicle Fleet Markers (GET /api/coches) & Animation on Route
+  // 3. Render and Animate ALL 5 Vehicle Fleet Markers (GET /api/coches)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    liveCoches.forEach((coche: LiveCochePosition) => {
+    liveCoches.forEach((coche: LiveCochePosition, index: number) => {
       const isSelected = selectedCocheId === coche.idCoche;
       const isMoving = coche.isMoving;
+      const color = ROUTE_COLORS[index % ROUTE_COLORS.length];
 
       const statusBadge = isMoving
-        ? `<span class="h-1.5 w-1.5 rounded-full bg-accentGreen animate-ping"></span><span class="text-accentGreen">EN RUTA</span>`
+        ? `<span class="h-1.5 w-1.5 rounded-full bg-accentGreen animate-ping"></span><span class="text-accentGreen font-bold">EN RUTA (${coche.currentStepIndex}/${coche.totalSteps})</span>`
         : `<span class="h-1.5 w-1.5 rounded-full bg-accentPurp"></span><span>BASE</span>`;
 
       const vehicleMarkerHtml = `
@@ -170,14 +174,14 @@ export const MapView: React.FC<MapViewProps> = ({
           isSelected ? "scale-125 z-[2500]" : "hover:scale-110 z-[1500]"
         }">
           <!-- License plate & Status badge -->
-          <div class="bg-darkBg border border-accentPurp text-[9px] font-extrabold font-mono text-textPri px-1.5 py-0.5 rounded shadow-lg flex items-center gap-1 mb-0.5 whitespace-nowrap">
+          <div class="bg-darkBg border border-panelBorder text-[9px] font-extrabold font-mono text-textPri px-1.5 py-0.5 rounded shadow-lg flex items-center gap-1 mb-0.5 whitespace-nowrap">
             ${statusBadge}
             <span>${coche.placa}</span>
           </div>
 
-          <!-- Metallic Truck Icon -->
-          <div class="relative flex items-center justify-center h-8 w-8 bg-gradient-to-br from-accentPurp to-accentPurpLight text-white rounded-full border-2 border-white/80 shadow-[0_0_12px_rgba(124,58,237,0.7)] ${
-            isMoving ? "animate-pulse" : ""
+          <!-- Truck Icon with custom route color -->
+          <div style="background-color: ${color}; border-color: #ffffff;" class="relative flex items-center justify-center h-8 w-8 text-white rounded-full border-2 shadow-[0_0_12px_rgba(124,58,237,0.7)] ${
+            isMoving ? "animate-pulse ring-2 ring-white/50" : ""
           }">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-4.2a1 1 0 0 0-.28-.7l-3.3-3.3a1 1 0 0 0-.7-.28H15v7.5A1.5 1.5 0 0 0 16.5 18z"/><circle cx="6.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
           </div>
@@ -267,53 +271,72 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   }, [selectedContainerId, selectedCocheId, containers, liveCoches]);
 
-  // 6. Draw Optimal Route
+  // 6. Render Multi-Vehicle Route Polylines for ALL 5 TRUCKS
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    if (optimalRoute && optimalRoute.path.length > 0) {
-      const latlngs = optimalRoute.path;
+    if (routingMode !== "none" && fleetRoutes && Object.keys(fleetRoutes).length > 0) {
+      const allBounds: L.LatLngBounds[] = [];
 
-      if (routePolylineRef.current) {
-        routePolylineRef.current.setLatLngs(latlngs);
-        routePolylineRef.current.addTo(map);
-      } else {
-        const polyline = L.polyline(latlngs, {
-          color: "#7c3aed",
-          weight: 4,
-          opacity: 0.85,
-          dashArray: "8, 6",
-          lineJoin: "round",
-        }).addTo(map);
-        routePolylineRef.current = polyline;
+      Object.entries(fleetRoutes).forEach(([idCocheStr, routeInfo], idx) => {
+        const idCoche = Number(idCocheStr);
+        if (!routeInfo || !routeInfo.path || routeInfo.path.length < 2) return;
+
+        const color = ROUTE_COLORS[idx % ROUTE_COLORS.length];
+        const latlngs = routeInfo.path;
+
+        if (fleetPolylinesRef.current[idCoche]) {
+          fleetPolylinesRef.current[idCoche].setLatLngs(latlngs);
+          fleetPolylinesRef.current[idCoche].setStyle({ color });
+          fleetPolylinesRef.current[idCoche].addTo(map);
+        } else {
+          const polyline = L.polyline(latlngs, {
+            color,
+            weight: 4,
+            opacity: 0.85,
+            dashArray: "8, 6",
+            lineJoin: "round",
+          }).addTo(map);
+
+          fleetPolylinesRef.current[idCoche] = polyline;
+        }
+
+        allBounds.push(fleetPolylinesRef.current[idCoche].getBounds());
+      });
+
+      const activeIds = new Set(Object.keys(fleetRoutes).map(Number));
+      Object.keys(fleetPolylinesRef.current).forEach((idStr) => {
+        const id = Number(idStr);
+        if (!activeIds.has(id)) {
+          fleetPolylinesRef.current[id].remove();
+          delete fleetPolylinesRef.current[id];
+        }
+      });
+
+      if (allBounds.length > 0) {
+        const firstBounds = allBounds[0];
+        allBounds.slice(1).forEach((b) => firstBounds.extend(b));
+        map.fitBounds(firstBounds, { padding: [50, 50], maxZoom: 15 });
       }
-
-      const bounds = routePolylineRef.current.getBounds();
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
     } else {
-      if (routePolylineRef.current) {
-        routePolylineRef.current.remove();
-        routePolylineRef.current = null;
-      }
+      Object.keys(fleetPolylinesRef.current).forEach((idStr) => {
+        const id = Number(idStr);
+        fleetPolylinesRef.current[id].remove();
+        delete fleetPolylinesRef.current[id];
+      });
     }
-  }, [optimalRoute]);
+  }, [routingMode, fleetRoutes]);
 
   const handleRecolectionRoute = () => {
     if (routingMode === "recolect") {
       setRoutingMode("none");
     } else {
-      // Usar la ubicación del primer camión como origen si está disponible
-      if (liveCoches.length > 0) {
-        setOperatorLocation({ lat: liveCoches[0].lat, lng: liveCoches[0].lng });
-      }
       setRoutingMode("recolect");
     }
   };
 
-  const activeFullBinsCount = containers.filter(
-    (c) => c.estado === "lleno"
-  ).length;
+  const activeVehiclesCount = liveCoches.filter((c) => c.isMoving).length;
 
   const selectedCoche = liveCoches.find((c) => c.idCoche === selectedCocheId);
 
@@ -351,49 +374,48 @@ export const MapView: React.FC<MapViewProps> = ({
         {/* Optimize Route Button */}
         <button
           onClick={handleRecolectionRoute}
-          disabled={activeFullBinsCount === 0}
-          className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg shadow-xl border select-none transition-all ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold rounded-lg shadow-xl border select-none transition-all ${
             routingMode === "recolect"
-              ? "bg-accentRed border-accentRed/30 text-white shadow-accentRed/10 hover:bg-accentRed/90"
-              : "glass-panel border-panelBorder text-textPri hover:border-textSec/30 disabled:opacity-50 disabled:pointer-events-none"
+              ? "bg-accentRed border-accentRed/30 text-white shadow-accentRed/20 hover:bg-accentRed/90"
+              : "glass-panel border-accentPurp/40 text-white hover:bg-accentPurp/20"
           }`}
         >
-          <Truck className="h-4 w-4" />
+          <Truck className="h-4 w-4 text-accentPurpLight" />
           <span>
             {routingMode === "recolect"
-              ? "Cancelar ruta recolección"
-              : `Iniciar Ruta de Recolección (${activeFullBinsCount} llenos)`}
+              ? "Detener Recolección de Flota"
+              : `Iniciar Recolección Flota (${liveCoches.length} Camiones)`}
           </span>
         </button>
 
         {routingMode === "recolect" && isRoutingLoading && (
-          <div className="glass-panel border-panelBorder p-3 rounded-lg shadow-xl text-xs flex items-center gap-2 animate-slide-in min-w-[200px] text-textSec">
+          <div className="glass-panel border-panelBorder p-3 rounded-lg shadow-xl text-xs flex items-center gap-2 animate-slide-in min-w-[220px] text-textSec">
             <span className="h-3 w-3 rounded-full border-2 border-accentPurp border-t-transparent animate-spin" />
-            Calculando ruta por calles reales...
+            Calculando rutas OSRM para los 5 camiones...
           </div>
         )}
 
         {routingMode === "recolect" && !isRoutingLoading && optimalRoute && (
-          <div className="glass-panel border-panelBorder p-3 rounded-lg shadow-xl text-xs flex flex-col gap-1.5 animate-slide-in min-w-[200px]">
-            <div className="text-[10px] text-accentRed uppercase font-bold tracking-wider mb-0.5 flex items-center justify-between">
-              <span>Ruta Activa - En movimiento</span>
+          <div className="glass-panel border-panelBorder p-3 rounded-lg shadow-xl text-xs flex flex-col gap-1.5 animate-slide-in min-w-[220px]">
+            <div className="text-[10px] text-accentGreen uppercase font-extrabold tracking-wider mb-0.5 flex items-center justify-between">
+              <span>Flota en Acción ({activeVehiclesCount}/{liveCoches.length} activos)</span>
               <span className="h-2 w-2 rounded-full bg-accentGreen animate-ping"></span>
             </div>
             <div className="flex justify-between text-textSec">
-              <span>Distancia total:</span>
+              <span>Distancia total flota:</span>
               <span className="font-bold text-textPri font-mono">
                 {optimalRoute.distance} km
               </span>
             </div>
             <div className="flex justify-between text-textSec">
-              <span>Tiempo estimado:</span>
+              <span>Tiempo estimado max:</span>
               <span className="font-bold text-textPri font-mono">
                 {optimalRoute.duration} min
               </span>
             </div>
-            <div className="text-[10px] text-accentGreen/90 font-medium border-t border-panelBorder/30 pt-1.5 leading-normal flex items-center gap-1">
-              <Truck className="h-3 w-3" />
-              <span>Camión avanzando por las calles trazadas...</span>
+            <div className="text-[10px] text-accentPurpLight font-semibold border-t border-panelBorder/30 pt-1.5 leading-normal flex items-center gap-1">
+              <Truck className="h-3.5 w-3.5 text-accentPurp" />
+              <span>Todos los camiones avanzando por sus rutas...</span>
             </div>
           </div>
         )}
@@ -445,7 +467,7 @@ export const MapView: React.FC<MapViewProps> = ({
             className="w-full bg-accentPurp hover:bg-accentPurp/90 text-white font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow shadow-accentPurp/20 mt-1"
           >
             <Navigation className="h-3.5 w-3.5 fill-current" />
-            <span>Iniciar Ruta desde este Vehículo</span>
+            <span>Asignar Recolección de Flota</span>
           </button>
         </div>
       )}
@@ -453,27 +475,23 @@ export const MapView: React.FC<MapViewProps> = ({
       {/* Floating Instructions Overlay */}
       <div className="absolute bottom-4 left-4 z-[400] glass-panel border-panelBorder/60 p-2.5 rounded-lg text-[10px] text-textSec max-w-xs shadow-md pointer-events-none">
         <div className="font-bold text-textPri mb-1 flex items-center gap-1">
-          <Truck className="h-3 w-3 text-accentPurp" /> Estado de Vehículos
+          <Truck className="h-3 w-3 text-accentPurp" /> Simulación Multivehículo ({liveCoches.length} Camiones)
         </div>
-        Los camiones permanecen en su punto inicial registrado en <span className="font-mono text-accentPurpLight">GET /api/coches</span> y avanzan por las calles únicamente cuando se inicia una ruta.
+        Haz clic en <span className="font-bold text-accentPurpLight">"Iniciar Recolección Flota"</span> para activar a **TODOS** los camiones de <span className="font-mono text-accentPurpLight">GET /api/coches</span> en sus rutas simultáneas.
       </div>
 
       {/* Floating Legend (Bottom Right) */}
       <div className="absolute bottom-4 right-4 z-[400] glass-panel border-panelBorder/80 px-3.5 py-2 rounded-lg flex items-center gap-4 text-[10px] font-semibold text-textSec shadow-lg select-none">
         <span className="text-[9px] uppercase font-bold text-textSec/80 mr-1">
-          Leyenda:
+          Leyenda Flota:
         </span>
         <div className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-accentPurp shadow-[0_0_6px_#7c3aed]" />
-          <span>Camión en punto inicial</span>
+          <span>5 Camiones Activos</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-accentRed shadow-[0_0_4px_#ef4444]" />
           <span>Lleno (&ge;85%)</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-accentOrange shadow-[0_0_4px_#f59e0b]" />
-          <span>Medio</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-accentGreen shadow-[0_0_4px_#22c55e]" />

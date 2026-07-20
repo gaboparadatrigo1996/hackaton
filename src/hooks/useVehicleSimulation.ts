@@ -15,28 +15,26 @@ export interface LiveCochePosition {
 }
 
 /**
- * Hook para controlar los vehículos devueltos por GET /api/coches:
- * 1. Los camiones permanecen estáticos en sus coordenadas iniciales de la API.
- * 2. ÚNICAMENTE cuando se traza/inicia una ruta (routingMode !== "none"), el vehículo asignado
- *    se desplaza en tiempo real siguiendo fielmente la polyline de la ruta trazada por las calles.
+ * Hook para controlar la simulación simultánea de TODOS los camiones de la flota (GET /api/coches):
+ * 1. Todos los camiones permanecen estáticos en sus coordenadas iniciales registradas en la API.
+ * 2. Cuando se inicia la recolección (routingMode !== "none"), CADA UNO de los 5 camiones se desplaza
+ *    SIMULTÁNEAMENTE a lo largo de su propia sub-ruta trazada por las calles.
  */
 export function useVehicleSimulation() {
-  const { coches, optimalRoute, routingMode, containers, triggerRecogida } =
+  const { coches, fleetRoutes, routingMode, containers, triggerRecogida } =
     useContainerStore();
 
   const [livePositions, setLivePositions] = useState<LiveCochePosition[]>([]);
-  const routeProgressRef = useRef<{ stepIndex: number; routePath: [number, number][] }>({
-    stepIndex: 0,
-    routePath: [],
-  });
 
-  // 1. Sincronizar coches en su punto inicial registrado en la API GET /api/coches
+  // Mantener el progreso del paso de animación para CADA UNO de los camiones de la flota
+  const cocheProgressMapRef = useRef<Map<number, number>>(new Map());
+
+  // 1. Inicializar o resetear la posición de todos los camiones al cambiar la flota o modo de ruta
   useEffect(() => {
     if (!coches || coches.length === 0) return;
 
-    // Si no hay ruta activa, todos los camiones se ubican fijamente en su punto inicial
-    if (routingMode === "none" || !optimalRoute || optimalRoute.path.length < 2) {
-      routeProgressRef.current = { stepIndex: 0, routePath: [] };
+    if (routingMode === "none" || !fleetRoutes || Object.keys(fleetRoutes).length === 0) {
+      cocheProgressMapRef.current.clear();
 
       const staticPositions: LiveCochePosition[] = coches.map((coche) => ({
         idCoche: coche.idCoche,
@@ -55,78 +53,85 @@ export function useVehicleSimulation() {
       return;
     }
 
-    // Cuando se inicia una ruta, asignamos la polyline trazada al primer vehículo (o el vehículo activo)
-    routeProgressRef.current = {
-      stepIndex: 0,
-      routePath: optimalRoute.path,
-    };
-  }, [coches, routingMode, optimalRoute]);
+    // Resetear el mapa de progreso de pasos para todos los vehículos activos
+    coches.forEach((coche) => {
+      cocheProgressMapRef.current.set(coche.idCoche, 0);
+    });
+  }, [coches, routingMode, fleetRoutes]);
 
-  // 2. Animación en tiempo real a lo largo de la ruta trazada
+  // 2. Bucle de animación simultánea para TODOS los camiones de la flota
   useEffect(() => {
     if (
       routingMode === "none" ||
-      !optimalRoute ||
-      optimalRoute.path.length < 2 ||
+      !fleetRoutes ||
+      Object.keys(fleetRoutes).length === 0 ||
       coches.length === 0
     ) {
       return;
     }
 
-    const path = optimalRoute.path;
     const interval = setInterval(() => {
       setLivePositions((prevPositions) => {
-        const { stepIndex } = routeProgressRef.current;
+        const progressMap = cocheProgressMapRef.current;
 
-        if (stepIndex >= path.length - 1) {
-          // Llegó al final de la ruta trazada
-          return prevPositions.map((pos, idx) =>
-            idx === 0 ? { ...pos, isMoving: false } : pos
-          );
-        }
+        return prevPositions.map((cochePos) => {
+          const vehicleRoute = fleetRoutes[cochePos.idCoche];
 
-        const nextStepIndex = stepIndex + 1;
-        routeProgressRef.current.stepIndex = nextStepIndex;
-
-        const currentPt = path[nextStepIndex];
-        const prevPt = path[stepIndex];
-
-        // Calcular rumbo (bearing) para rotar el icono según el sentido de la calle
-        const dLat = currentPt[0] - prevPt[0];
-        const dLng = currentPt[1] - prevPt[1];
-        const bearing = (Math.atan2(dLng, dLat) * 180) / Math.PI;
-
-        // Comprobar si el camión pasa cerca de algún contenedor de la ruta para vaciarlo
-        containers.forEach((c) => {
-          if (c.estado === "lleno" || c.estado === "medio") {
-            const dist =
-              Math.hypot(c.lat - currentPt[0], c.lng - currentPt[1]) * 111000; // Distancia en metros aprox.
-            if (dist < 40) {
-              triggerRecogida(c.id);
-            }
+          // Si este camión no tiene ruta asignada o la ruta es muy corta, permanece estático
+          if (!vehicleRoute || !vehicleRoute.path || vehicleRoute.path.length < 2) {
+            return { ...cochePos, isMoving: false };
           }
-        });
 
-        return prevPositions.map((pos, idx) => {
-          if (idx === 0) {
-            // El camión asignado a la ruta avanza a la siguiente coordenada de la calle
+          const routePath = vehicleRoute.path;
+          const currentStep = progressMap.get(cochePos.idCoche) || 0;
+
+          // Si llegó al final de su ruta individual
+          if (currentStep >= routePath.length - 1) {
             return {
-              ...pos,
-              lat: currentPt[0],
-              lng: currentPt[1],
-              bearing,
-              isMoving: true,
-              currentStepIndex: nextStepIndex,
-              totalSteps: path.length,
+              ...cochePos,
+              isMoving: false,
+              currentStepIndex: routePath.length - 1,
+              totalSteps: routePath.length,
             };
           }
-          return pos;
+
+          const nextStep = currentStep + 1;
+          progressMap.set(cochePos.idCoche, nextStep);
+
+          const currentPt = routePath[nextStep];
+          const prevPt = routePath[currentStep];
+
+          // Calcular ángulo de dirección / bearing del camión en la calle
+          const dLat = currentPt[0] - prevPt[0];
+          const dLng = currentPt[1] - prevPt[1];
+          const bearing = (Math.atan2(dLng, dLat) * 180) / Math.PI;
+
+          // Vaciar contenedores que se encuentren en la ruta de este camión
+          containers.forEach((c) => {
+            if (c.estado === "lleno" || c.estado === "medio") {
+              const dist =
+                Math.hypot(c.lat - currentPt[0], c.lng - currentPt[1]) * 111000;
+              if (dist < 40) {
+                triggerRecogida(c.id);
+              }
+            }
+          });
+
+          return {
+            ...cochePos,
+            lat: currentPt[0],
+            lng: currentPt[1],
+            bearing,
+            isMoving: true,
+            currentStepIndex: nextStep,
+            totalSteps: routePath.length,
+          };
         });
       });
-    }, 400); // Avanza cada 400ms a lo largo de la polyline trazada
+    }, 450); // Avanza cada 450ms a lo largo de las rutas simultáneas
 
     return () => clearInterval(interval);
-  }, [routingMode, optimalRoute, coches, containers, triggerRecogida]);
+  }, [routingMode, fleetRoutes, coches, containers, triggerRecogida]);
 
   return livePositions;
 }
