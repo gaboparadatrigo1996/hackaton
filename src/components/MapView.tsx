@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from "react";
 import L from "leaflet";
 import { useContainerStore } from "../store/useContainerStore";
-import { Truck, RefreshCw, AlertTriangle } from "lucide-react";
+import { useVehicleSimulation } from "../hooks/useVehicleSimulation";
+import type { LiveCochePosition } from "../hooks/useVehicleSimulation";
+import { Truck, RefreshCw, AlertTriangle, Play, Pause, Navigation, X, ShieldCheck } from "lucide-react";
 
 interface MapViewProps {
   isLoading?: boolean;
@@ -19,6 +21,7 @@ export const MapView: React.FC<MapViewProps> = ({
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<{ [id: string]: L.Marker }>({});
+  const cocheMarkersRef = useRef<{ [idCoche: number]: L.Marker }>({});
   const routePolylineRef = useRef<L.Polyline | null>(null);
   const operatorMarkerRef = useRef<L.Marker | null>(null);
 
@@ -32,13 +35,20 @@ export const MapView: React.FC<MapViewProps> = ({
     optimalRoute,
     setRoutingMode,
     isRoutingLoading,
+    coches,
+    selectedCocheId,
+    setSelectedCocheId,
+    isSimulatingVehicles,
+    toggleSimulatingVehicles,
   } = useContainerStore();
+
+  // Hook de simulación en tiempo real para la flota de coches (GET /api/coches)
+  const liveCoches = useVehicleSimulation();
 
   // 1. Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    // Create map instance centered on La Paz, Bolivia
     const map = L.map(mapContainerRef.current, {
       center: [-16.512, -68.128],
       zoom: 13,
@@ -51,7 +61,6 @@ export const MapView: React.FC<MapViewProps> = ({
       })
       .addTo(map);
 
-    // Dark-v11 style tiles (CartoDB Dark Matter)
     L.tileLayer(
       "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
       {
@@ -75,7 +84,6 @@ export const MapView: React.FC<MapViewProps> = ({
     const map = mapRef.current;
     if (!map) return;
 
-    // Helper to get marker HTML based on level/state
     const getMarkerHTML = (
       level: number,
       estado: string,
@@ -107,7 +115,6 @@ export const MapView: React.FC<MapViewProps> = ({
       `;
     };
 
-    // Update markers on map
     containers.forEach((c) => {
       const isSelected = selectedContainerId === c.id;
       const markerHtml = getMarkerHTML(c.nivelLlenado, c.estado, isSelected);
@@ -120,7 +127,6 @@ export const MapView: React.FC<MapViewProps> = ({
       });
 
       if (markersRef.current[c.id]) {
-        // Update existing marker position & icon
         const marker = markersRef.current[c.id];
         marker.setLatLng([c.lat, c.lng]);
         marker.setIcon(customIcon);
@@ -130,17 +136,16 @@ export const MapView: React.FC<MapViewProps> = ({
           marker.setZIndexOffset(0);
         }
       } else {
-        // Create new marker
         const marker = L.marker([c.lat, c.lng], { icon: customIcon })
           .addTo(map)
           .on("click", () => {
             setSelectedContainerId(c.id);
+            setSelectedCocheId(null);
           });
         markersRef.current[c.id] = marker;
       }
     });
 
-    // Cleanup markers that are no longer in store
     const storeIds = new Set(containers.map((c) => c.id));
     Object.keys(markersRef.current).forEach((id) => {
       if (!storeIds.has(id)) {
@@ -148,9 +153,58 @@ export const MapView: React.FC<MapViewProps> = ({
         delete markersRef.current[id];
       }
     });
-  }, [containers, selectedContainerId, setSelectedContainerId]);
+  }, [containers, selectedContainerId, setSelectedContainerId, setSelectedCocheId]);
 
-  // 3. Manage Operator Truck Marker (Draggable)
+  // 3. Render and Animate Vehicle Fleet Markers (GET /api/coches)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    liveCoches.forEach((coche: LiveCochePosition) => {
+      const isSelected = selectedCocheId === coche.idCoche;
+
+      const vehicleMarkerHtml = `
+        <div class="relative flex flex-col items-center group transition-transform duration-300 ${
+          isSelected ? "scale-125 z-[2500]" : "hover:scale-110 z-[1500]"
+        }">
+          <!-- License plate badge -->
+          <div class="bg-darkBg border border-accentPurp text-[9px] font-extrabold font-mono text-textPri px-1.5 py-0.5 rounded shadow-lg flex items-center gap-1 mb-0.5 whitespace-nowrap">
+            <span class="h-1.5 w-1.5 rounded-full bg-accentGreen animate-ping"></span>
+            <span>${coche.placa}</span>
+          </div>
+
+          <!-- Metallic Truck Icon -->
+          <div class="relative flex items-center justify-center h-8 w-8 bg-gradient-to-br from-accentPurp to-accentPurpLight text-white rounded-full border-2 border-white/80 shadow-[0_0_12px_rgba(124,58,237,0.7)]">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-4.2a1 1 0 0 0-.28-.7l-3.3-3.3a1 1 0 0 0-.7-.28H15v7.5A1.5 1.5 0 0 0 16.5 18z"/><circle cx="6.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          </div>
+        </div>
+      `;
+
+      const customIcon = L.divIcon({
+        className: "custom-coche-marker",
+        html: vehicleMarkerHtml,
+        iconSize: [36, 42],
+        iconAnchor: [18, 36],
+      });
+
+      if (cocheMarkersRef.current[coche.idCoche]) {
+        const marker = cocheMarkersRef.current[coche.idCoche];
+        marker.setLatLng([coche.lat, coche.lng]);
+        marker.setIcon(customIcon);
+      } else {
+        const marker = L.marker([coche.lat, coche.lng], { icon: customIcon })
+          .addTo(map)
+          .on("click", () => {
+            setSelectedCocheId(coche.idCoche);
+            setSelectedContainerId(null);
+          });
+
+        cocheMarkersRef.current[coche.idCoche] = marker;
+      }
+    });
+  }, [liveCoches, selectedCocheId, setSelectedCocheId, setSelectedContainerId]);
+
+  // 4. Manage Operator Base Truck Marker (Draggable)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -191,21 +245,25 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   }, [operatorLocation, setOperatorLocation]);
 
-  // 4. Center Selected Container
+  // 5. Center Selected Container or Selected Vehicle
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !selectedContainerId) return;
+    if (!map) return;
 
-    const target = containers.find((c) => c.id === selectedContainerId);
-    if (target) {
-      map.setView([target.lat, target.lng], 15, {
-        animate: true,
-        duration: 1.2,
-      });
+    if (selectedContainerId) {
+      const target = containers.find((c) => c.id === selectedContainerId);
+      if (target) {
+        map.setView([target.lat, target.lng], 15, { animate: true, duration: 1 });
+      }
+    } else if (selectedCocheId) {
+      const targetCoche = liveCoches.find((c) => c.idCoche === selectedCocheId);
+      if (targetCoche) {
+        map.setView([targetCoche.lat, targetCoche.lng], 15, { animate: true, duration: 1 });
+      }
     }
-  }, [selectedContainerId, containers]);
+  }, [selectedContainerId, selectedCocheId, containers, liveCoches]);
 
-  // 5. Draw Optimal Route
+  // 6. Draw Optimal Route
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -227,7 +285,6 @@ export const MapView: React.FC<MapViewProps> = ({
         routePolylineRef.current = polyline;
       }
 
-      // Adjust camera zoom to fit whole route bounds
       const bounds = routePolylineRef.current.getBounds();
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
     } else {
@@ -249,6 +306,8 @@ export const MapView: React.FC<MapViewProps> = ({
   const activeFullBinsCount = containers.filter(
     (c) => c.estado === "lleno"
   ).length;
+
+  const selectedCoche = liveCoches.find((c) => c.idCoche === selectedCocheId);
 
   return (
     <div className="relative flex-1 h-full min-w-0">
@@ -279,8 +338,27 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       )}
 
-      {/* Route Mode Overlay Control */}
+      {/* Fleet Controls & Simulation Overlay (Top Right) */}
       <div className="absolute top-4 right-4 z-[400] flex flex-col gap-2">
+        {/* Toggle Simulation Button for Vehicles */}
+        <button
+          onClick={toggleSimulatingVehicles}
+          className="glass-panel border-panelBorder hover:border-accentPurp/40 text-textPri px-3 py-2 text-xs font-semibold rounded-lg shadow-xl flex items-center gap-2 transition-all"
+        >
+          {isSimulatingVehicles ? (
+            <>
+              <Pause className="h-4 w-4 text-accentOrange animate-pulse" />
+              <span>Pausar simulación flota ({coches.length} vehículos)</span>
+            </>
+          ) : (
+            <>
+              <Play className="h-4 w-4 text-accentGreen" />
+              <span>Reanudar simulación flota ({coches.length} vehículos)</span>
+            </>
+          )}
+        </button>
+
+        {/* Optimize Route Button */}
         <button
           onClick={handleRecolectionRoute}
           disabled={activeFullBinsCount === 0}
@@ -329,13 +407,63 @@ export const MapView: React.FC<MapViewProps> = ({
         )}
       </div>
 
+      {/* Floating Card for Selected Vehicle (from GET /api/coches) */}
+      {selectedCoche && (
+        <div className="absolute top-4 left-16 z-[450] glass-panel border-accentPurp/40 p-4 rounded-xl shadow-2xl w-72 animate-slide-in text-xs flex flex-col gap-2.5">
+          <div className="flex items-center justify-between border-b border-panelBorder pb-2">
+            <div className="flex items-center gap-2">
+              <span className="bg-accentPurp/20 border border-accentPurp/40 text-accentPurpLight px-2 py-0.5 rounded font-mono font-black text-xs">
+                {selectedCoche.placa}
+              </span>
+              <span className="flex items-center gap-1 text-[10px] text-accentGreen font-bold bg-accentGreen/10 px-2 py-0.5 rounded-full border border-accentGreen/20">
+                <ShieldCheck className="h-3 w-3" />
+                <span>{selectedCoche.estadoCoche}</span>
+              </span>
+            </div>
+            <button
+              onClick={() => setSelectedCocheId(null)}
+              className="text-textSec hover:text-textPri p-1 rounded hover:bg-panelBg"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-1 text-textSec">
+            <div className="flex justify-between">
+              <span>ID Vehículo (API):</span>
+              <span className="font-mono text-textPri font-bold">Coche #{selectedCoche.idCoche}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Capacidad de Carga:</span>
+              <span className="font-mono text-textPri font-bold">{selectedCoche.capacidad} L</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Coordenadas GPS:</span>
+              <span className="font-mono text-textPri text-[10px]">
+                {selectedCoche.lat.toFixed(5)}, {selectedCoche.lng.toFixed(5)}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              setOperatorLocation({ lat: selectedCoche.lat, lng: selectedCoche.lng });
+              handleRecolectionRoute();
+            }}
+            className="w-full bg-accentPurp hover:bg-accentPurp/90 text-white font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow shadow-accentPurp/20 mt-1"
+          >
+            <Navigation className="h-3.5 w-3.5 fill-current" />
+            <span>Asignar Ruta de Recolección</span>
+          </button>
+        </div>
+      )}
+
       {/* Floating Instructions Overlay */}
       <div className="absolute bottom-4 left-4 z-[400] glass-panel border-panelBorder/60 p-2.5 rounded-lg text-[10px] text-textSec max-w-xs shadow-md pointer-events-none">
         <div className="font-bold text-textPri mb-1 flex items-center gap-1">
-          <Truck className="h-3 w-3 text-accentPurp" /> Simulación de Camión
+          <Truck className="h-3 w-3 text-accentPurp" /> Simulación de Flota IoT
         </div>
-        Arrastra el camión morado en el mapa para reubicar la base y recalcular
-        las rutas de servicio.
+        5 vehículos en vivo devueltos por <span className="font-mono text-accentPurpLight">GET /api/coches</span> patrullando las calles de La Paz en tiempo real.
       </div>
 
       {/* Floating Legend (Bottom Right) */}
@@ -343,6 +471,10 @@ export const MapView: React.FC<MapViewProps> = ({
         <span className="text-[9px] uppercase font-bold text-textSec/80 mr-1">
           Leyenda:
         </span>
+        <div className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-accentPurp shadow-[0_0_6px_#7c3aed]" />
+          <span>Vehículo / Coche</span>
+        </div>
         <div className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-accentRed shadow-[0_0_4px_#ef4444]" />
           <span>Lleno (&ge;85%)</span>
@@ -354,10 +486,6 @@ export const MapView: React.FC<MapViewProps> = ({
         <div className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-accentGreen shadow-[0_0_4px_#22c55e]" />
           <span>Vacío (&lt;40%)</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-accentPurpLight shadow-[0_0_4px_#a78bfa]" />
-          <span>Mant.</span>
         </div>
       </div>
     </div>

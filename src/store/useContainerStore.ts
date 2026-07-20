@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Contenedor, NotificationItem } from "../types";
+import type { CocheInfoDTO } from "../types/sensor";
 import { initialContainers } from "../data/mockContainers";
 
 interface RouteInfo {
@@ -22,6 +23,11 @@ interface ContainerState {
   optimalRoute: RouteInfo | null;
   isRoutingLoading: boolean;
 
+  // Flota de Coches (GET /api/coches)
+  coches: CocheInfoDTO[];
+  selectedCocheId: number | null;
+  isSimulatingVehicles: boolean;
+
   // Actions
   setContainers: (containers: Contenedor[]) => void;
   updateContainer: (id: string, updates: Partial<Contenedor>) => void;
@@ -31,17 +37,22 @@ interface ContainerState {
   setFilterEstado: (estado: string) => void;
   setFilterTipo: (tipo: string) => void;
   addNotification: (
-    notification: Omit<NotificationItem, "id" | "timestamp" | "read">,
+    notification: Omit<NotificationItem, "id" | "timestamp" | "read">
   ) => void;
   clearNotifications: () => void;
   dismissNotification: (id: string) => void;
   setRoutingMode: (
     mode: "none" | "single" | "recolect",
-    targetId?: string | null,
+    targetId?: string | null
   ) => void;
   setOperatorLocation: (loc: { lat: number; lng: number }) => void;
   triggerRecogida: (id: string) => void;
   calculateRoute: () => Promise<void>;
+
+  // Coche actions
+  setCoches: (coches: CocheInfoDTO[]) => void;
+  setSelectedCocheId: (id: number | null) => void;
+  toggleSimulatingVehicles: () => void;
 }
 
 // Helper to calculate geographical distance (Haversine formula) in kilometers
@@ -49,7 +60,7 @@ const calculateDistance = (
   lat1: number,
   lon1: number,
   lat2: number,
-  lon2: number,
+  lon2: number
 ): number => {
   const R = 6371; // Radio de la Tierra en km
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -73,10 +84,8 @@ interface RoadRouteResult {
   duration: number; // min
 }
 
-// Requests a real, road-following route through an ordered list of waypoints ([lat, lng][]).
-// Returns null if the routing service is unreachable or returns no route, so callers can fall back gracefully.
 const fetchRoadRoute = async (
-  waypoints: [number, number][],
+  waypoints: [number, number][]
 ): Promise<RoadRouteResult | null> => {
   if (waypoints.length < 2) return null;
 
@@ -93,13 +102,13 @@ const fetchRoadRoute = async (
 
     const route = data.routes[0];
     const path: [number, number][] = route.geometry.coordinates.map(
-      ([lng, lat]: [number, number]) => [lat, lng] as [number, number],
+      ([lng, lat]: [number, number]) => [lat, lng] as [number, number]
     );
 
     return {
       path,
-      distance: parseFloat((route.distance / 1000).toFixed(2)), // metros -> km
-      duration: Math.max(1, Math.round(route.duration / 60)), // segundos -> minutos
+      distance: parseFloat((route.distance / 1000).toFixed(2)),
+      duration: Math.max(1, Math.round(route.duration / 60)),
     };
   } catch (error) {
     console.error("[Routing] No se pudo obtener la ruta real (OSRM):", error);
@@ -107,11 +116,9 @@ const fetchRoadRoute = async (
   }
 };
 
-// Fallback when the routing service is unreachable: connects waypoints with straight segments
-// so the app keeps working offline, but this is only used as a last resort.
 const buildFallbackRoute = (
   waypoints: [number, number][],
-  extraMinutesPerStop = 0,
+  extraMinutesPerStop = 0
 ): RoadRouteResult => {
   let totalDistance = 0;
   for (let i = 0; i < waypoints.length - 1; i++) {
@@ -119,14 +126,14 @@ const buildFallbackRoute = (
       waypoints[i][0],
       waypoints[i][1],
       waypoints[i + 1][0],
-      waypoints[i + 1][1],
+      waypoints[i + 1][1]
     );
   }
 
-  const stopsCount = Math.max(0, waypoints.length - 2); // excluye origen y primer destino
+  const stopsCount = Math.max(0, waypoints.length - 2);
   const duration = Math.max(
     2,
-    Math.round(totalDistance * 2 + 1 + stopsCount * extraMinutesPerStop),
+    Math.round(totalDistance * 2 + 1 + stopsCount * extraMinutesPerStop)
   );
 
   return {
@@ -146,9 +153,14 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
   notifications: [],
   routingMode: "none",
   routingTargetId: null,
-  operatorLocation: { lat: -16.512, lng: -68.128 }, // Cerca de Sopocachi / Plaza Abaroa
+  operatorLocation: { lat: -16.512, lng: -68.128 },
   optimalRoute: null,
   isRoutingLoading: false,
+
+  // Flota de Coches (GET /api/coches)
+  coches: [],
+  selectedCocheId: null,
+  isSimulatingVehicles: true,
 
   setContainers: (containers) => set({ containers }),
 
@@ -157,13 +169,11 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
       const nextContainers = state.containers.map((c) => {
         if (c.id === id) {
           const updated = { ...c, ...updates };
-          // Auto adjustment of state based on level
           if (updates.nivelLlenado !== undefined) {
             updated.litrosActuales = Math.round(
-              (updated.capacidadLitros * updated.nivelLlenado) / 100,
+              (updated.capacidadLitros * updated.nivelLlenado) / 100
             );
 
-            // If updating level, auto adjust status unless in maintenance
             if (c.estado !== "mantenimiento") {
               if (updated.nivelLlenado >= 85) {
                 updated.estado = "lleno";
@@ -179,7 +189,6 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
         return c;
       });
 
-      // Recalculate route if container updates and routing is active
       setTimeout(() => {
         if (get().routingMode !== "none") {
           get().calculateRoute();
@@ -198,12 +207,11 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
 
   addNotification: (n) => {
     set((state) => {
-      // Prevent duplicate active notifications for the same container if they are recent
       const exists = state.notifications.some(
         (notif) =>
           notif.containerId === n.containerId &&
           !notif.read &&
-          Date.now() - notif.timestamp.getTime() < 30000,
+          Date.now() - notif.timestamp.getTime() < 30000
       );
       if (exists) return {};
 
@@ -213,7 +221,7 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
         timestamp: new Date(),
         read: false,
       };
-      return { notifications: [newNotif, ...state.notifications].slice(0, 20) }; // Cap at 20
+      return { notifications: [newNotif, ...state.notifications].slice(0, 20) };
     });
   },
 
@@ -243,17 +251,15 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
       estado: "vacio",
       ultimaRecogida: new Date().toISOString(),
       proximaRecogida: new Date(
-        Date.now() + 24 * 60 * 60 * 1000 * 2,
-      ).toISOString(), // en 2 días
+        Date.now() + 24 * 60 * 60 * 1000 * 2
+      ).toISOString(),
       totalRecogidas:
         (get().containers.find((c) => c.id === id)?.totalRecogidas || 0) + 1,
     });
 
-    // Remove routing to this container if it was single route target
     if (get().routingMode === "single" && get().routingTargetId === id) {
       set({ routingMode: "none", routingTargetId: null, optimalRoute: null });
     } else if (get().routingMode === "recolect") {
-      // Recalculate collection route since this container is no longer full
       get().calculateRoute();
     }
   },
@@ -284,7 +290,6 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
       set({ isRoutingLoading: true });
       const roadRoute = await fetchRoadRoute([startLoc, endLoc]);
 
-      // If routing mode changed while we were awaiting the request, discard this result
       if (
         get().routingMode !== "single" ||
         get().routingTargetId !== routingTargetId
@@ -296,7 +301,6 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
         isRoutingLoading: false,
       });
     } else if (routingMode === "recolect") {
-      // Collect route: visit all "lleno" containers.
       const fullContainers = containers.filter((c) => c.estado === "lleno");
 
       if (fullContainers.length === 0) {
@@ -304,8 +308,6 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
         return;
       }
 
-      // Order the stops with a Nearest Neighbor heuristic (TSP approximation) using
-      // straight-line distance; the actual on-road path is then fetched from OSRM.
       let currentLoc = startLoc;
       const unvisited = [...fullContainers];
       const orderedStops: [number, number][] = [];
@@ -319,7 +321,7 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
             currentLoc[0],
             currentLoc[1],
             unvisited[i].lat,
-            unvisited[i].lng,
+            unvisited[i].lng
           );
           if (d < minDistance) {
             minDistance = d;
@@ -339,7 +341,6 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
       set({ isRoutingLoading: true });
       const roadRoute = await fetchRoadRoute(waypoints);
 
-      // If routing mode changed while we were awaiting the request, discard this result
       if (get().routingMode !== "recolect") return;
 
       set({
@@ -348,4 +349,10 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
       });
     }
   },
+
+  // Flota actions
+  setCoches: (coches) => set({ coches }),
+  setSelectedCocheId: (id) => set({ selectedCocheId: id }),
+  toggleSimulatingVehicles: () =>
+    set((state) => ({ isSimulatingVehicles: !state.isSimulatingVehicles })),
 }));
