@@ -18,7 +18,7 @@ interface ContainerDetailPanelProps {
   isLoading?: boolean;
 }
 
-export const ContainerDetailPanel: React.FC<ContainerDetailPanelProps> = ({
+const ContainerDetailPanelComponent: React.FC<ContainerDetailPanelProps> = ({
   isLoading,
 }) => {
   const {
@@ -116,7 +116,7 @@ export const ContainerDetailPanel: React.FC<ContainerDetailPanelProps> = ({
   const sensorDetails = sensorQuery.data;
 
   return (
-    <aside className="w-[310px] glass-panel-floating rounded-2xl flex flex-col h-full flex-shrink-0 animate-slide-in select-none text-xs z-20 overflow-y-auto custom-scrollbar shadow-2xl">
+    <aside className="w-[310px] glass-panel-floating rounded-2xl flex flex-col h-full flex-shrink-0 animate-slide-in select-none text-xs z-20 overflow-y-auto custom-scrollbar shadow-2xl [isolation:isolate] [transform:translateZ(0)]">
       {/* Panel Header */}
       <div className="p-4 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#0e0e14]/90 backdrop-blur-xl z-10 rounded-t-2xl">
         <div className="flex flex-col">
@@ -335,3 +335,5 @@ export const ContainerDetailPanel: React.FC<ContainerDetailPanelProps> = ({
     </aside>
   );
 };
+
+export const ContainerDetailPanel = React.memo(ContainerDetailPanelComponent);

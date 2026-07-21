@@ -12,14 +12,14 @@ interface SidebarProps {
   refetch?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({
+const SidebarComponent: React.FC<SidebarProps> = ({
   isLoading,
   isError,
   error,
   refetch,
 }) => {
   return (
-    <aside className="w-[310px] glass-panel-floating rounded-2xl flex flex-col h-full p-4 flex-shrink-0 select-none overflow-hidden shadow-2xl">
+    <aside className="w-[310px] glass-panel-floating rounded-2xl flex flex-col h-full p-4 flex-shrink-0 select-none overflow-hidden shadow-2xl [isolation:isolate] [transform:translateZ(0)]">
       {/* Dashboard Toggle / Status */}
       <div className="flex items-center gap-2 bg-[#161622]/80 backdrop-blur-md border border-white/10 p-2.5 rounded-xl text-xs font-semibold text-textPri shadow-sm flex-shrink-0">
         <LayoutGrid className="h-4 w-4 text-accentPurp" />
@@ -138,3 +138,5 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
   );
 };
+
+export const Sidebar = React.memo(SidebarComponent);

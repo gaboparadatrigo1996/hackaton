@@ -14,7 +14,7 @@ interface MapViewProps {
 
 const ROUTE_COLORS = ["#7c3aed", "#10b981", "#06b6d4", "#f59e0b", "#ec4899"];
 
-export const MapView: React.FC<MapViewProps> = ({
+const MapViewComponent: React.FC<MapViewProps> = ({
   isLoading,
   isError,
   error,
@@ -341,9 +341,9 @@ export const MapView: React.FC<MapViewProps> = ({
   const selectedCoche = liveCoches.find((c) => c.idCoche === selectedCocheId);
 
   return (
-    <div className="relative flex-1 h-full min-w-0">
+    <div className="relative flex-1 h-full min-w-0 [isolation:isolate] [transform:translateZ(0)]">
       {/* Leaflet container */}
-      <div ref={mapContainerRef} className="w-full h-full" />
+      <div ref={mapContainerRef} className="w-full h-full relative [isolation:isolate]" />
 
       {/* Loading Overlay Badge */}
       {isLoading && (
@@ -494,3 +494,5 @@ export const MapView: React.FC<MapViewProps> = ({
     </div>
   );
 };
+
+export const MapView = React.memo(MapViewComponent);

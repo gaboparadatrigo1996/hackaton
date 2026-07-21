@@ -19,7 +19,7 @@ function App() {
       <ProjectHeader />
 
       {/* Main Workspace Layout with Map taking full background */}
-      <div className="relative flex-1 min-h-0 w-full overflow-hidden">
+      <div className="relative flex-1 min-h-0 w-full overflow-hidden [isolation:isolate]">
         {/* Central interactive MapView taking 100% of workspace background */}
         <MapView
           isLoading={isLoading}
@@ -29,9 +29,9 @@ function App() {
         />
 
         {/* Floating Glass Panels Layer: Left Sidebar & Right Detail Panel at z-20 */}
-        <div className="absolute inset-0 z-20 flex flex-row justify-between h-full w-full pointer-events-none p-3 overflow-hidden">
+        <div className="absolute inset-0 z-20 flex flex-row justify-between h-full w-full pointer-events-none p-3 overflow-hidden [isolation:isolate] [transform:translateZ(0)]">
           {/* Left column: Floating translucent sidebar */}
-          <div className="pointer-events-auto h-full">
+          <div className="pointer-events-auto h-full [transform:translateZ(0)]">
             <Sidebar
               isLoading={isLoading}
               isError={isError}
@@ -41,7 +41,7 @@ function App() {
           </div>
 
           {/* Right column: Selected container detailed insights */}
-          <div className="pointer-events-auto h-full">
+          <div className="pointer-events-auto h-full [transform:translateZ(0)]">
             <ContainerDetailPanel isLoading={isLoading} />
           </div>
         </div>
