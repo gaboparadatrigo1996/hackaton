@@ -10,7 +10,7 @@ export const WeeklyFillChart: React.FC<WeeklyFillChartProps> = ({ contenedor }) 
   const data = contenedor.historialSemanal;
 
   return (
-    <div className="w-full h-36 bg-darkBg border border-panelBorder/70 rounded-lg p-2.5 mt-2">
+    <div className="w-full h-36 glass-card-subtle border border-white/10 rounded-xl p-2.5 mt-2">
       <span className="text-[10px] text-textSec uppercase font-bold tracking-wider block mb-1">
         Llenado Semanal (%)
       </span>

@@ -68,6 +68,13 @@ export function useRealtimeSensors() {
   });
 
   useEffect(() => {
+    if (query.isError) {
+      setContainers([]);
+      setCoches([]);
+      prevContainersRef.current = {};
+      return;
+    }
+
     if (!query.data) return;
 
     const { containers: newContainers, coches: newCoches } = query.data;
@@ -111,7 +118,7 @@ export function useRealtimeSensors() {
       newMap[c.id] = c;
     });
     prevContainersRef.current = newMap;
-  }, [query.data, setContainers, setCoches, addNotification]);
+  }, [query.data, query.isError, setContainers, setCoches, addNotification]);
 
   return query;
 }

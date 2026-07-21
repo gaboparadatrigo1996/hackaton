@@ -44,7 +44,7 @@ export const ContainerList: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 mt-3 border-t border-panelBorder pt-3">
+    <div className="flex flex-col mt-3 border-t border-panelBorder pt-3">
       {/* Search Input */}
       <div className="relative mb-2">
         <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-textSec">
@@ -121,8 +121,8 @@ export const ContainerList: React.FC = () => {
         )}
       </div>
 
-      {/* Scrollable Container List */}
-      <div className="flex-1 overflow-y-auto pr-1 gap-2 flex flex-col custom-scrollbar">
+      {/* Container List Cards */}
+      <div className="gap-2 flex flex-col pb-2">
         {filteredContainers.length > 0 ? (
           filteredContainers.map((c) => (
             <ContainerListItem

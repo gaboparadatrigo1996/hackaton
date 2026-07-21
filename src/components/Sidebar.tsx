@@ -19,9 +19,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   refetch,
 }) => {
   return (
-    <aside className="w-[300px] border-r border-panelBorder bg-darkBg flex flex-col h-full p-4 flex-shrink-0 select-none">
+    <aside className="w-[310px] glass-panel-floating rounded-2xl flex flex-col h-full p-4 flex-shrink-0 select-none overflow-hidden shadow-2xl">
       {/* Dashboard Toggle / Status */}
-      <div className="flex items-center gap-2 bg-panelBg border border-panelBorder p-2 rounded-lg text-xs font-semibold text-textPri shadow-sm">
+      <div className="flex items-center gap-2 bg-[#161622]/80 backdrop-blur-md border border-white/10 p-2.5 rounded-xl text-xs font-semibold text-textPri shadow-sm flex-shrink-0">
         <LayoutGrid className="h-4 w-4 text-accentPurp" />
         <span>Dashboard de Monitoreo</span>
         <span
@@ -37,7 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Error state banner */}
       {isError && (
-        <div className="mt-3 bg-accentRed/10 border border-accentRed/30 p-3 rounded-lg flex flex-col gap-2 animate-slide-in">
+        <div className="mt-3 bg-accentRed/10 border border-accentRed/30 p-3 rounded-lg flex flex-col gap-2 flex-shrink-0 animate-slide-in">
           <div className="flex items-center gap-2 text-accentRed text-xs font-bold">
             <ServerOff className="h-4 w-4 flex-shrink-0" />
             <span>Error de conexión API Azure</span>
@@ -59,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Loading Skeletons */}
       {isLoading ? (
-        <div className="flex flex-col gap-3 mt-3 animate-pulse">
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-3 mt-3 pr-1 animate-pulse">
           {/* KPI Skeleton Grid */}
           <div className="grid grid-cols-2 gap-2">
             {[1, 2, 3, 4].map((i) => (
@@ -110,8 +110,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             ))}
           </div>
         </div>
+      ) : isError ? (
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center p-6 text-textSec text-xs gap-3">
+          <ServerOff className="h-10 w-10 text-accentRed/70" />
+          <div className="space-y-1">
+            <p className="font-bold text-textPri text-sm">Sin datos de telemetría</p>
+            <p className="text-[11px] leading-relaxed">
+              No se pudo establecer comunicación con la API de Azure. Verifique la URL de la API y la conexión de red.
+            </p>
+          </div>
+        </div>
       ) : (
-        <>
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1 mt-3 space-y-3">
           {/* KPI Stats Summary (2x2) */}
           <SummaryCards />
 
@@ -123,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Scrollable Container list & filters */}
           <ContainerList />
-        </>
+        </div>
       )}
     </aside>
   );

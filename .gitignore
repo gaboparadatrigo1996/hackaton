@@ -22,3 +22,19 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# OSRM Data & Map files
+infra/osrm/data/*
+!infra/osrm/data/.gitkeep
+osrm/data/*
+!osrm/data/.gitkeep
+*.osm.pbf
+*.osrm*
+
+# Environment and sensitive config files
+.env
+.env.local
+application-local.properties
+*.properties
+
+

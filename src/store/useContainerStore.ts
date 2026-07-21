@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import type { Contenedor, NotificationItem } from "../types";
 import type { CocheInfoDTO } from "../types/sensor";
-import { initialContainers } from "../data/mockContainers";
 
 export interface RouteInfo {
   path: [number, number][];
@@ -76,8 +75,10 @@ const calculateDistance = (
   return R * c;
 };
 
-// Public OSRM demo server: returns real driving directions that follow actual streets.
-const OSRM_ROUTE_URL = "https://router.project-osrm.org/route/v1/driving/";
+// Servidor OSRM local/desplegado para cálculo de rutas reales sobre calles de Bolivia
+const OSRM_BASE_URL = import.meta.env.VITE_OSRM_URL || "http://localhost:5000";
+const OSRM_ROUTE_URL = `${OSRM_BASE_URL.replace(/\/+$/, "")}/route/v1/driving/`;
+
 
 export interface RoadRouteResult {
   path: [number, number][];
@@ -145,7 +146,7 @@ const buildFallbackRoute = (
 };
 
 export const useContainerStore = create<ContainerState>((set, get) => ({
-  containers: initialContainers,
+  containers: [],
   selectedContainerId: null,
   searchQuery: "",
   filterZona: "all",

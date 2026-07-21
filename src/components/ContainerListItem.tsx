@@ -53,10 +53,10 @@ export const ContainerListItem: React.FC<ListItemProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`p-3 rounded-lg border cursor-pointer select-none transition-all duration-200 ${
+      className={`p-3 rounded-xl border cursor-pointer select-none transition-all duration-300 ${
         isSelected
-          ? "bg-panelBg border-accentPurp shadow-md shadow-accentPurp/10"
-          : "bg-panelBg/40 border-panelBorder hover:border-textSec/30 hover:bg-panelBg/70"
+          ? "glass-card-subtle border-accentPurp bg-[#1a1a2b]/90 shadow-lg shadow-accentPurp/20 ring-1 ring-accentPurp/30"
+          : "glass-card-subtle border-white/8 hover:border-accentPurp/50 hover:bg-[#1a1a28]/80 hover:shadow-md hover:-translate-y-0.5"
       }`}
     >
       <div className="flex items-start justify-between gap-2">

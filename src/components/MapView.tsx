@@ -374,10 +374,10 @@ export const MapView: React.FC<MapViewProps> = ({
         {/* Optimize Route Button */}
         <button
           onClick={handleRecolectionRoute}
-          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold rounded-lg shadow-xl border select-none transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl shadow-2xl border select-none transition-all ${
             routingMode === "recolect"
-              ? "bg-accentRed border-accentRed/30 text-white shadow-accentRed/20 hover:bg-accentRed/90"
-              : "glass-panel border-accentPurp/40 text-white hover:bg-accentPurp/20"
+              ? "bg-accentRed border-accentRed/40 text-white shadow-accentRed/30 hover:bg-accentRed/90"
+              : "glass-panel-floating border-accentPurp/50 text-white hover:bg-accentPurp/20"
           }`}
         >
           <Truck className="h-4 w-4 text-accentPurpLight" />
@@ -389,14 +389,14 @@ export const MapView: React.FC<MapViewProps> = ({
         </button>
 
         {routingMode === "recolect" && isRoutingLoading && (
-          <div className="glass-panel border-panelBorder p-3 rounded-lg shadow-xl text-xs flex items-center gap-2 animate-slide-in min-w-[220px] text-textSec">
-            <span className="h-3 w-3 rounded-full border-2 border-accentPurp border-t-transparent animate-spin" />
+          <div className="glass-panel-floating border-white/10 p-3.5 rounded-xl shadow-2xl text-xs flex items-center gap-2 animate-slide-in min-w-[220px] text-textSec">
+            <span className="h-3.5 w-3.5 rounded-full border-2 border-accentPurp border-t-transparent animate-spin" />
             Calculando rutas OSRM para los 5 camiones...
           </div>
         )}
 
         {routingMode === "recolect" && !isRoutingLoading && optimalRoute && (
-          <div className="glass-panel border-panelBorder p-3 rounded-lg shadow-xl text-xs flex flex-col gap-1.5 animate-slide-in min-w-[220px]">
+          <div className="glass-panel-floating border-white/10 p-3.5 rounded-xl shadow-2xl text-xs flex flex-col gap-1.5 animate-slide-in min-w-[220px]">
             <div className="text-[10px] text-accentGreen uppercase font-extrabold tracking-wider mb-0.5 flex items-center justify-between">
               <span>Flota en Acción ({activeVehiclesCount}/{liveCoches.length} activos)</span>
               <span className="h-2 w-2 rounded-full bg-accentGreen animate-ping"></span>
@@ -413,7 +413,7 @@ export const MapView: React.FC<MapViewProps> = ({
                 {optimalRoute.duration} min
               </span>
             </div>
-            <div className="text-[10px] text-accentPurpLight font-semibold border-t border-panelBorder/30 pt-1.5 leading-normal flex items-center gap-1">
+            <div className="text-[10px] text-accentPurpLight font-semibold border-t border-white/10 pt-1.5 leading-normal flex items-center gap-1">
               <Truck className="h-3.5 w-3.5 text-accentPurp" />
               <span>Todos los camiones avanzando por sus rutas...</span>
             </div>
@@ -423,10 +423,10 @@ export const MapView: React.FC<MapViewProps> = ({
 
       {/* Floating Card for Selected Vehicle (from GET /api/coches) */}
       {selectedCoche && (
-        <div className="absolute top-4 left-16 z-[450] glass-panel border-accentPurp/40 p-4 rounded-xl shadow-2xl w-72 animate-slide-in text-xs flex flex-col gap-2.5">
-          <div className="flex items-center justify-between border-b border-panelBorder pb-2">
+        <div className="absolute top-4 left-4 md:left-[330px] z-[50] glass-panel-floating border-accentPurp/60 p-4 rounded-2xl shadow-2xl w-80 animate-slide-in text-xs flex flex-col gap-3 backdrop-blur-2xl bg-[#0e0e14]/95 text-textPri pointer-events-auto">
+          <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
             <div className="flex items-center gap-2">
-              <span className="bg-accentPurp/20 border border-accentPurp/40 text-accentPurpLight px-2 py-0.5 rounded font-mono font-black text-xs">
+              <span className="bg-accentPurp/20 border border-accentPurp/40 text-accentPurpLight px-2.5 py-1 rounded-lg font-mono font-black text-xs shadow-sm">
                 {selectedCoche.placa}
               </span>
               <span className="flex items-center gap-1 text-[10px] text-accentGreen font-bold bg-accentGreen/10 px-2 py-0.5 rounded-full border border-accentGreen/20">
@@ -436,22 +436,23 @@ export const MapView: React.FC<MapViewProps> = ({
             </div>
             <button
               onClick={() => setSelectedCocheId(null)}
-              className="text-textSec hover:text-textPri p-1 rounded hover:bg-panelBg"
+              className="text-textSec hover:text-textPri p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+              title="Cerrar detalles del vehículo"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          <div className="flex flex-col gap-1 text-textSec">
-            <div className="flex justify-between">
+          <div className="flex flex-col gap-1.5 text-textSec text-[11px]">
+            <div className="flex justify-between items-center bg-[#161622]/60 p-2 rounded-xl border border-white/5">
               <span>ID Vehículo (API):</span>
               <span className="font-mono text-textPri font-bold">Coche #{selectedCoche.idCoche}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center bg-[#161622]/60 p-2 rounded-xl border border-white/5">
               <span>Capacidad de Carga:</span>
               <span className="font-mono text-textPri font-bold">{selectedCoche.capacidad} L</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center bg-[#161622]/60 p-2 rounded-xl border border-white/5">
               <span>Coordenadas GPS:</span>
               <span className="font-mono text-textPri text-[10px]">
                 {selectedCoche.lat.toFixed(5)}, {selectedCoche.lng.toFixed(5)}
@@ -464,7 +465,7 @@ export const MapView: React.FC<MapViewProps> = ({
               setOperatorLocation({ lat: selectedCoche.lat, lng: selectedCoche.lng });
               handleRecolectionRoute();
             }}
-            className="w-full bg-accentPurp hover:bg-accentPurp/90 text-white font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow shadow-accentPurp/20 mt-1"
+            className="w-full bg-accentPurp hover:bg-accentPurp/90 text-white font-semibold py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-accentPurp/30 mt-1"
           >
             <Navigation className="h-3.5 w-3.5 fill-current" />
             <span>Asignar Recolección de Flota</span>
@@ -472,16 +473,8 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       )}
 
-      {/* Floating Instructions Overlay */}
-      <div className="absolute bottom-4 left-4 z-[400] glass-panel border-panelBorder/60 p-2.5 rounded-lg text-[10px] text-textSec max-w-xs shadow-md pointer-events-none">
-        <div className="font-bold text-textPri mb-1 flex items-center gap-1">
-          <Truck className="h-3 w-3 text-accentPurp" /> Simulación Multivehículo ({liveCoches.length} Camiones)
-        </div>
-        Haz clic en <span className="font-bold text-accentPurpLight">"Iniciar Recolección Flota"</span> para activar a **TODOS** los camiones de <span className="font-mono text-accentPurpLight">GET /api/coches</span> en sus rutas simultáneas.
-      </div>
-
       {/* Floating Legend (Bottom Right) */}
-      <div className="absolute bottom-4 right-4 z-[400] glass-panel border-panelBorder/80 px-3.5 py-2 rounded-lg flex items-center gap-4 text-[10px] font-semibold text-textSec shadow-lg select-none">
+      <div className="absolute bottom-4 right-4 z-[400] glass-panel-floating border-white/10 px-4 py-2.5 rounded-xl flex items-center gap-4 text-[10px] font-semibold text-textSec shadow-2xl select-none">
         <span className="text-[9px] uppercase font-bold text-textSec/80 mr-1">
           Leyenda Flota:
         </span>

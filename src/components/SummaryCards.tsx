@@ -17,52 +17,52 @@ export const SummaryCards: React.FC = () => {
   const mantenimiento = containers.filter(c => c.estado === "mantenimiento").length;
 
   return (
-    <div className="grid grid-cols-2 gap-2 mt-3">
+    <div className="grid grid-cols-2 gap-2.5 mt-1">
       {/* Total Bins */}
-      <div className="bg-panelBg border border-panelBorder p-3 rounded-lg flex flex-col justify-between hover:border-panelBorder/90 transition-all duration-300">
+      <div className="glass-card-subtle border border-white/10 p-3 rounded-xl flex flex-col justify-between hover:border-accentPurp/40 transition-all duration-300">
         <div className="flex items-center justify-between text-textSec">
           <span className="text-[10px] uppercase font-bold tracking-wider">Total</span>
-          <Trash2 className="h-3.5 w-3.5" />
+          <Trash2 className="h-3.5 w-3.5 text-accentPurpLight" />
         </div>
-        <div className="mt-2.5">
-          <p className="text-xl font-extrabold text-textPri leading-none">{total}</p>
-          <span className="text-[9px] text-textSec mt-1 block">Contenedores</span>
+        <div className="mt-2">
+          <p className="text-xl font-black text-textPri leading-none">{total}</p>
+          <span className="text-[9px] text-textSec mt-1 block font-medium">Contenedores</span>
         </div>
       </div>
 
       {/* Avg Fill Level */}
-      <div className="bg-panelBg border border-panelBorder p-3 rounded-lg flex flex-col justify-between hover:border-panelBorder/90 transition-all duration-300">
+      <div className="glass-card-subtle border border-white/10 p-3 rounded-xl flex flex-col justify-between hover:border-accentPurp/40 transition-all duration-300">
         <div className="flex items-center justify-between text-textSec">
           <span className="text-[10px] uppercase font-bold tracking-wider">Llenado Medio</span>
-          <TrendingUp className="h-3.5 w-3.5" />
+          <TrendingUp className="h-3.5 w-3.5 text-accentPurpLight" />
         </div>
-        <div className="mt-2.5">
-          <p className="text-xl font-extrabold text-textPri leading-none">{avgFill}%</p>
-          <span className="text-[9px] text-textSec mt-1 block">Capacidad total</span>
+        <div className="mt-2">
+          <p className="text-xl font-black text-textPri leading-none">{avgFill}%</p>
+          <span className="text-[9px] text-textSec mt-1 block font-medium">Capacidad total</span>
         </div>
       </div>
 
       {/* Critical Bins */}
-      <div className="bg-panelBg border border-panelBorder p-3 rounded-lg flex flex-col justify-between hover:border-accentRed/20 transition-all duration-300">
+      <div className="glass-card-subtle border border-white/10 p-3 rounded-xl flex flex-col justify-between hover:border-accentRed/30 transition-all duration-300">
         <div className="flex items-center justify-between text-accentRed">
           <span className="text-[10px] uppercase font-bold tracking-wider">Críticos</span>
           <AlertTriangle className="h-3.5 w-3.5 animate-pulse" />
         </div>
-        <div className="mt-2.5">
-          <p className="text-xl font-extrabold text-accentRed leading-none">{criticos}</p>
-          <span className="text-[9px] text-textSec mt-1 block">Llenos ahora</span>
+        <div className="mt-2">
+          <p className="text-xl font-black text-accentRed leading-none">{criticos}</p>
+          <span className="text-[9px] text-textSec mt-1 block font-medium">Llenos ahora</span>
         </div>
       </div>
 
       {/* Maintenance Bins */}
-      <div className="bg-panelBg border border-panelBorder p-3 rounded-lg flex flex-col justify-between hover:border-accentPurp/20 transition-all duration-300">
+      <div className="glass-card-subtle border border-white/10 p-3 rounded-xl flex flex-col justify-between hover:border-accentPurp/30 transition-all duration-300">
         <div className="flex items-center justify-between text-accentPurpLight">
           <span className="text-[10px] uppercase font-bold tracking-wider">Mantenimiento</span>
           <ShieldAlert className="h-3.5 w-3.5" />
         </div>
-        <div className="mt-2.5">
-          <p className="text-xl font-extrabold text-accentPurpLight leading-none">{mantenimiento}</p>
-          <span className="text-[9px] text-textSec mt-1 block">Fuera de servicio</span>
+        <div className="mt-2">
+          <p className="text-xl font-black text-accentPurpLight leading-none">{mantenimiento}</p>
+          <span className="text-[9px] text-textSec mt-1 block font-medium">Fuera de servicio</span>
         </div>
       </div>
     </div>

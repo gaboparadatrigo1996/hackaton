@@ -116,9 +116,9 @@ export const ContainerDetailPanel: React.FC<ContainerDetailPanelProps> = ({
   const sensorDetails = sensorQuery.data;
 
   return (
-    <aside className="w-[300px] border-l border-panelBorder bg-darkBg flex flex-col h-full flex-shrink-0 animate-slide-in select-none text-xs z-20 overflow-y-auto">
+    <aside className="w-[310px] glass-panel-floating rounded-2xl flex flex-col h-full flex-shrink-0 animate-slide-in select-none text-xs z-20 overflow-y-auto custom-scrollbar shadow-2xl">
       {/* Panel Header */}
-      <div className="p-4 border-b border-panelBorder flex items-center justify-between sticky top-0 bg-darkBg/95 backdrop-blur z-10">
+      <div className="p-4 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#0e0e14]/90 backdrop-blur-xl z-10 rounded-t-2xl">
         <div className="flex flex-col">
           <h2 className="font-bold text-textPri text-sm leading-tight flex items-center gap-1.5">
             <span>{nombre}</span>
@@ -129,15 +129,15 @@ export const ContainerDetailPanel: React.FC<ContainerDetailPanelProps> = ({
         </div>
         <button
           onClick={() => setSelectedContainerId(null)}
-          className="text-textSec hover:text-textPri p-1 rounded-md hover:bg-panelBg transition-colors"
+          className="text-textSec hover:text-textPri p-1 rounded-lg hover:bg-white/10 transition-colors"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-3.5">
         {/* Status Card & Fill Bar */}
-        <div className="glass-panel border-panelBorder p-3 rounded-lg flex flex-col gap-2.5">
+        <div className="glass-card-subtle border border-white/10 p-3 rounded-xl flex flex-col gap-2.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] uppercase font-bold text-textSec">
               Estado Telemetría
@@ -211,7 +211,7 @@ export const ContainerDetailPanel: React.FC<ContainerDetailPanelProps> = ({
         </div>
 
         {/* Real Sensor Details from API (GET /api/contenedor/contenedor/{idContenedor}) */}
-        <div className="glass-panel border-panelBorder p-3 rounded-lg flex flex-col gap-2">
+        <div className="glass-card-subtle border border-white/10 p-3 rounded-xl flex flex-col gap-2">
           <div className="text-[10px] uppercase font-bold text-accentPurpLight flex items-center gap-1">
             <Cpu className="h-3 w-3 text-accentPurp" />
             <span>Sensor Asignado (GET /api/contenedor/contenedor)</span>
@@ -243,7 +243,7 @@ export const ContainerDetailPanel: React.FC<ContainerDetailPanelProps> = ({
 
         {/* Route Info Card if calculating or showing route */}
         {isSelectedForRouting && (
-          <div className="glass-panel border-accentPurp/40 p-3 rounded-lg text-xs space-y-1.5 animate-slide-in">
+          <div className="glass-card-subtle border border-accentPurp/40 p-3 rounded-xl text-xs space-y-1.5 animate-slide-in">
             <div className="text-[10px] text-accentPurpLight font-bold uppercase tracking-wider flex items-center gap-1">
               <Activity className="h-3 w-3" />
               Ruta Calculada por OSRM
@@ -273,7 +273,7 @@ export const ContainerDetailPanel: React.FC<ContainerDetailPanelProps> = ({
         )}
 
         {/* General Attributes */}
-        <div className="glass-panel border-panelBorder p-3 rounded-lg space-y-2">
+        <div className="glass-card-subtle border border-white/10 p-3 rounded-xl space-y-2">
           <div className="text-[10px] uppercase font-bold text-textSec mb-1">
             Ubicación y Tipo
           </div>
@@ -305,7 +305,7 @@ export const ContainerDetailPanel: React.FC<ContainerDetailPanelProps> = ({
         <WeeklyFillChart contenedor={container} />
 
         {/* Recolection Metrics */}
-        <div className="glass-panel border-panelBorder p-3 rounded-lg space-y-2">
+        <div className="glass-card-subtle border border-white/10 p-3 rounded-xl space-y-2">
           <div className="text-[10px] uppercase font-bold text-textSec mb-1">
             Historial de Operación
           </div>

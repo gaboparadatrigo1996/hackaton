@@ -24,7 +24,7 @@ export const StatusDonutChart: React.FC = () => {
   const displayData = hasData ? data : [{ name: "Sin datos", value: 1, color: "#26262f" }];
 
   return (
-    <div className="bg-panelBg border border-panelBorder p-3 rounded-lg flex flex-col mt-3">
+    <div className="glass-card-subtle border border-white/10 p-3 rounded-xl flex flex-col mt-3">
       <span className="text-[10px] text-textSec uppercase font-bold tracking-wider mb-2">
         Distribución de Estados
       </span>

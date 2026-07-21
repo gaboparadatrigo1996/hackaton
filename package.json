@@ -7,7 +7,13 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "osrm:crop": "bash scripts/recortar-mapa.sh",
+    "osrm:download": "bash scripts/download-map.sh",
+    "osrm:setup": "bash scripts/setup-osrm.sh",
+    "osrm:up": "docker compose -f infra/osrm/docker-compose.yml up -d",
+    "osrm:down": "docker compose -f infra/osrm/docker-compose.yml down",
+    "osrm:logs": "docker compose -f infra/osrm/docker-compose.yml logs -f"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.3",
